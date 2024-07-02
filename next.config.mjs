@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+
 const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-eval' 'unsafe-inline';
@@ -9,23 +10,21 @@ const cspHeader = `
     base-uri 'self';
     form-action 'self';
     frame-ancestors 'none';
-    upgrade-insecure-requests;
-`;
+    upgrade-insecure-requests;`
 
-module.exports = {
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "Content-Security-Policy",
-            value: cspHeader.replace(/\n/g, ""),
-          },
-        ],
-      },
-    ];
-  },
+
+const nextConfig = {
+  headers: [
+    {
+      source: "/(.*)",
+      headers: [
+        {
+          key: "Content-Security-Policy",
+          value: cspHeader.replace(/\n/g, ""),
+        },
+      ],
+    },
+  ],
 };
 
 export default nextConfig;
