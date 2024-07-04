@@ -19,6 +19,9 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { http, encodeFunctionData } from "viem";
 import { Identity } from "@semaphore-protocol/identity";
 
+import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
+
+
 import {
   BUNDLER_URL,
   CHAIN,
@@ -28,6 +31,7 @@ import {
 
 import { publicClient } from "../config/viem";
 import { GATEKEEPER_ABI } from "../config/gatekeeper";
+import { STORAGE_ABI } from "../config/storage";
 
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
@@ -63,12 +67,14 @@ export default function AccountCreationForm() {
 
     const permissionValidator = await toPermissionValidator(publicClient, {
       signer: ecdsaSigner,
+      kernelVersion: KERNEL_V3_1,
       policies: [sudoPolicy],
       entryPoint: ENTRYPOINT_ADDRESS_V07,
     });
 
     sessionKeyAccount = await createKernelAccount(publicClient, {
       entryPoint: ENTRYPOINT_ADDRESS_V07,
+      kernelVersion: KERNEL_V3_1,
       plugins: {
         sudo: passkeyValidator,
         regular: permissionValidator,
@@ -110,8 +116,8 @@ export default function AccountCreationForm() {
 
     const passkeyValidator = await toPasskeyValidator(publicClient, {
       webAuthnKey,
-      passkeyServerUrl: PASSKEY_SERVER_URL,
       entryPoint: ENTRYPOINT_ADDRESS_V07,
+      kernelVersion: KERNEL_V3_1,
     });
 
     await createAccountAndClient(passkeyValidator);
@@ -130,8 +136,8 @@ export default function AccountCreationForm() {
 
     const passkeyValidator = await toPasskeyValidator(publicClient, {
       webAuthnKey,
-      passkeyServerUrl: PASSKEY_SERVER_URL,
       entryPoint: ENTRYPOINT_ADDRESS_V07,
+      kernelVersion: KERNEL_V3_1,
     });
 
     await createAccountAndClient(passkeyValidator);
@@ -151,7 +157,7 @@ export default function AccountCreationForm() {
       data: encodeFunctionData({
         abi: GATEKEEPER_ABI,
         functionName: "enter",
-        args: [1, 1],
+        args: [0, commitment],
       }),
     });
 
