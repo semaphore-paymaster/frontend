@@ -151,7 +151,7 @@ export default function AccountCreationForm() {
       data: encodeFunctionData({
         abi: GATEKEEPER_ABI,
         functionName: "enter",
-        args: [7, 1],
+        args: [1, 1],
       }),
     });
 
