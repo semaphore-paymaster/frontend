@@ -16,8 +16,8 @@ import { toSudoPolicy } from "@zerodev/permissions/policies";
 import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless";
 import React, { useState } from "react";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { http } from "viem";
-
+import { http, encodeFunctionData } from "viem";
+import { Identity } from "@semaphore-protocol/identity";
 
 import {
   BUNDLER_URL,
@@ -27,7 +27,7 @@ import {
 } from "../config/zerodev";
 
 import { publicClient } from "../config/viem";
-
+import { GATEKEEPER_ABI } from "../config/gatekeeper";
 
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
@@ -47,6 +47,12 @@ export default function AccountCreationForm() {
   const [userOpCount, setUserOpCount] = useState(0);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [poapBalance, setPoapBalance] = useState("0");
+
+  const [semaphorePrivateKey, setSemaphorePrivateKey] = useState<string | Uint8Array | Buffer | undefined>();
+  const [semaphorePublicKey, setSemaphorePublicKey] = useState<
+    string | Uint8Array | Buffer | undefined
+  >();
+
 
   const createAccountAndClient = async (passkeyValidator: any) => {
     const ecdsaSigner = await toECDSASigner({
@@ -93,9 +99,7 @@ export default function AccountCreationForm() {
     setAccountAddress(sessionKeyAccount.address);
   };
 
-  // Function to be called when "Register" is clicked
   const handleRegister = async () => {
-    console.log("Registering with username:", username);
     setIsRegistering(true);
 
     const webAuthnKey = await toWebAuthnKey({
@@ -113,11 +117,9 @@ export default function AccountCreationForm() {
     await createAccountAndClient(passkeyValidator);
 
     setIsRegistering(false);
-    window.alert("Register done.  Try sending UserOps.");
   };
 
   const handleLogin = async () => {
-    console.log("Logging in with username:", username);
     setIsLoggingIn(true);
 
     const webAuthnKey = await toWebAuthnKey({
@@ -135,26 +137,34 @@ export default function AccountCreationForm() {
     await createAccountAndClient(passkeyValidator);
 
     setIsLoggingIn(false);
-    window.alert("Login done.  Try sending UserOps.");
   };
 
   const handleSendUserOp = async () => {
     setIsSendingUserOp(true);
-    setUserOpStatus("Sending UserOp...");
-    console.log("Sending userop with username:", username);
+    setUserOpStatus("Joining...");
+
+    const { privateKey, publicKey, commitment } = new Identity();
+
+    const callData = await kernelClient.account.encodeCallData({
+      to: process.env.NEXT_PUBLIC_GATEKEEPER_CONTRACT,
+      value: BigInt(0),
+      data: encodeFunctionData({
+        abi: GATEKEEPER_ABI,
+        functionName: "enter",
+        args: [7, 1],
+      }),
+    });
 
     const userOpHash = await kernelClient.sendUserOperation({
       userOperation: {
-        callData: await sessionKeyAccount.encodeCallData({
-          to: "0x0000000000000000000000000000000000000000",
-          value: BigInt(0),
-          data: "0x",
-        }),
+        callData
       },
     });
 
+    setSemaphorePrivateKey(privateKey);
+    setSemaphorePublicKey(publicKey.toString());
+
     setUserOpHash(userOpHash);
-    console.log("waiting for userOp:", userOpHash);
 
     const bundlerClient = kernelClient.extend(
       bundlerActions(ENTRYPOINT_ADDRESS_V07)
@@ -165,7 +175,6 @@ export default function AccountCreationForm() {
 
     setUserOpCount(userOpCount + 1);
 
-    // Update the message based on the count of UserOps
     const userOpMessage =
       userOpCount === 0
         ? `First UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Now try sending another UserOp.`
@@ -209,8 +218,6 @@ export default function AccountCreationForm() {
           </div>
           <div>
             <div className="h-full flex flex-col justify-end">
-              {" "}
-              {/* Add flex container to align items at the end */}
               <button
                 onClick={handleLogin}
                 disabled={isLoggingIn || isRegistering}
@@ -237,7 +244,12 @@ export default function AccountCreationForm() {
           )}
           {accountAddress && parseInt(poapBalance) > 0 && (
             <div className="mb-2 text-center font-medium">
-              Poap Balance: <span>{poapBalance}</span>
+              Can I join the group?:{" "}
+              <span>
+                {parseInt(poapBalance) > 0
+                  ? "Yes!"
+                  : "Unfortunately you are not eligible"}
+              </span>
             </div>
           )}
           {accountAddress && (
@@ -255,28 +267,69 @@ export default function AccountCreationForm() {
               {isCheckingBalance ? (
                 <div className="spinner"></div>
               ) : (
-                "Check Poap Balance"
+                "Check Eligibility"
               )}
             </button>
           )}
-          <button
-            onClick={handleSendUserOp}
-            disabled={!isKernelClientReady || isSendingUserOp}
-            className={`w-full px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
-              isKernelClientReady && !isSendingUserOp
-                ? "bg-green-500 hover:bg-green-700 focus:ring-green-500"
-                : "bg-gray-500"
-            }`}
-          >
-            {isSendingUserOp ? <div className="spinner"></div> : "Send UserOp"}
-          </button>
-          {userOpHash && (
-            <div
-              className="mt-2 text-center"
-              dangerouslySetInnerHTML={{
-                __html: userOpStatus,
-              }}
-            />
+
+          {/* {accountAddress && parseInt(poapBalance) > 0 && (
+            <button
+              onClick={async () =>
+                await joinSemaphoreGroup(accountAddress as `0x${string}`)
+              }
+              disabled={isLoggingIn || isRegistering || isCheckingBalance}
+              className={`w-full mb-10 px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
+                isKernelClientReady && !isSendingUserOp
+                  ? "bg-green-500 hover:bg-green-700 focus:ring-green-500"
+                  : "bg-gray-500"
+              }`}
+            >
+              {isCheckingBalance ? (
+                <div className="spinner"></div>
+              ) : (
+                "Join the Semaphore Group"
+              )}
+            </button>
+          )} */}
+
+          {accountAddress && parseInt(poapBalance) > 0 && (
+            <>
+              <button
+                onClick={handleSendUserOp}
+                disabled={!isKernelClientReady || isSendingUserOp}
+                className={`w-full px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
+                  isKernelClientReady && !isSendingUserOp
+                    ? "bg-green-500 hover:bg-green-700 focus:ring-green-500"
+                    : "bg-gray-500"
+                }`}
+              >
+                {isSendingUserOp ? (
+                  <div className="spinner"></div>
+                ) : (
+                  "Join the group"
+                )}
+              </button>
+              {userOpHash && (
+                <>
+                  <div
+                    className="mt-2 text-center"
+                    dangerouslySetInnerHTML={{
+                      __html: userOpStatus,
+                    }}
+                  />
+
+                  <div>
+                    <strong>Please keep these values in a safe place.</strong>
+                    <div>
+                      Private Key: <pre>{semaphorePrivateKey}</pre>
+                    </div>
+                    <div>
+                      Public Key: <pre>{semaphorePublicKey}</pre>
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
