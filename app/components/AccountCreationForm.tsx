@@ -17,9 +17,21 @@ import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless";
 import React, { useState } from "react";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { http, encodeFunctionData } from "viem";
+import { encodeAbiParameters } from "viem";
+import { parseAbiParameters } from "viem";
+
+
+
+
+
 import { Identity } from "@semaphore-protocol/identity";
 
 import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
+
+import { SemaphoreSubgraph } from "@semaphore-protocol/data";
+import { generateProof } from "@semaphore-protocol/proof";
+import { Group } from "@semaphore-protocol/group";
+
 
 
 import {
@@ -32,6 +44,8 @@ import {
 import { publicClient } from "../config/viem";
 import { GATEKEEPER_ABI } from "../config/gatekeeper";
 import { STORAGE_ABI } from "../config/storage";
+import { GET_GROUP_DATA } from "../config/apollo";
+import { useQuery } from "@apollo/client";
 
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
@@ -52,7 +66,9 @@ export default function AccountCreationForm() {
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [isBalanceChecked, setIsBalanceChecked] = useState(false);
   const [poapBalance, setPoapBalance] = useState("0");
-
+  const [isSemaphoreGroupAssigned, setIsSemaphoreGroupAssigned] = useState(false);
+  const [semaphoreGroupIdentity, setSemaphoreGroupIdentity] = useState<Identity>();
+  const { loading, error, data } = useQuery(GET_GROUP_DATA);
 
   const [semaphorePrivateKey, setSemaphorePrivateKey] = useState<string | Uint8Array | Buffer | undefined>();
   const [semaphorePublicKey, setSemaphorePublicKey] = useState<
@@ -90,28 +106,67 @@ export default function AccountCreationForm() {
       entryPoint: ENTRYPOINT_ADDRESS_V07,
       middleware: {
         sponsorUserOperation: async ({ userOperation }) => {
-
           const zeroDevPaymaster = await createZeroDevPaymasterClient({
             chain: CHAIN,
             transport: http(PAYMASTER_URL),
             entryPoint: ENTRYPOINT_ADDRESS_V07,
           });
 
+          console.log("data", data);
+
+          // if (!userOperation.factory && data) {
+          //   console.log("test", "sponsorUserOperation");
+          //   console.log("userOperation ~", userOperation);
+          //   console.log("semaphoreGroupData ~", semaphoreGroupData);
+
+          //   const {
+          //     merkleTreeDepth,
+          //     merkleTreeRoot,
+          //     nullifier,
+          //     message,
+          //     scope,
+          //     points,
+          //   } = semaphoreGroupData;
+
+          //   const encodedPoints = encodeAbiParameters(
+          //     parseAbiParameters(
+          //       "uint, uint, uint, uint, uint, uint, uint, uint"
+          //     ),
+          //     points.map((point: number) => BigInt(point))
+          //   );
+
+          //   const encodedSemaphoreData = encodeAbiParameters(
+          //     parseAbiParameters("uint, uint, uint, uint, uint, bytes"),
+          //     [
+          //       merkleTreeDepth,
+          //       merkleTreeRoot,
+          //       nullifier,
+          //       message,
+          //       scope,
+          //       encodedPoints,
+          //     ]
+          //   );
+
+          //   const paymasterData = encodeAbiParameters(
+          //     [
+          //       { name: "validUntil", type: "uint48" },
+          //       { name: "validAfter", type: "uint48" },
+          //       { name: "signature", type: "bytes" },
+          //     ],
+          //     [0, 0, semaphoreGroupData]
+          //   );
+
+          //   return {
+          //     ...userOperation,
+          //     paymaster: 0x94b8c54a73cba9f2b942d76f2b4ce318330e36d7,
+          //     paymasterData,
+          //   };
+          // }
+
           return zeroDevPaymaster.sponsorUserOperation({
             userOperation,
             entryPoint: ENTRYPOINT_ADDRESS_V07,
           });
-
-          // if (userOperation.initCode !== "0x") {
-          //   // new account
-          // }
-          // // old account
-
-          // return {
-          //   ...userOperation,
-          //   paymaster: "0x....",
-          //   paymasterData: "0x.....",
-          // }
         },
       },
     });
@@ -164,7 +219,10 @@ export default function AccountCreationForm() {
     setIsSendingUserOp(true);
     setUserOpStatus("Joining...");
 
-    const { privateKey, publicKey, commitment } = new Identity();
+    const identity = new Identity();
+    const {
+      privateKey, publicKey, commitment
+    } = identity;
 
     const callData = await kernelClient.account.encodeCallData({
       to: process.env.NEXT_PUBLIC_GATEKEEPER_CONTRACT,
@@ -203,6 +261,8 @@ export default function AccountCreationForm() {
 
     setUserOpStatus(userOpMessage);
     setIsSendingUserOp(false);  
+    setIsSemaphoreGroupAssigned(true);
+    setSemaphoreGroupIdentity(identity);
   };
 
   const checkPoapBalance = async (account: `0x${string}`) => {
@@ -217,6 +277,54 @@ export default function AccountCreationForm() {
     setIsBalanceChecked(true);
   };
 
+  const handleVoting = async () => {
+    if (semaphoreGroupIdentity) {
+        const semaphoreSubgraph = new SemaphoreSubgraph("sepolia");
+        const { members } = await semaphoreSubgraph.getGroup("3", {
+          members: true,
+        });
+
+        const group = new Group(members);
+        const scope = group.root;
+        const message = 1;
+
+        const proof = await generateProof(
+          semaphoreGroupIdentity,
+          group,
+          message,
+          scope
+        );
+         
+        semaphoreGroupData = group;
+
+        const callData = await kernelClient.account.encodeCallData({
+          to: process.env.NEXT_PUBLIC_STORAGE_CONTRACT,
+          value: BigInt(0),
+          data: encodeFunctionData({
+            abi: STORAGE_ABI,
+            functionName: "store",
+            args: [6],
+          }),
+        });
+
+
+        console.log("proof", proof);
+
+        setIsSendingUserOp(true);
+
+        const userOpHash = await kernelClient.sendUserOperation({
+          userOperation: {
+            callData,
+
+          },
+        });
+
+
+        setIsSendingUserOp(false);
+
+        console.log("userOpHash", userOpHash);
+    } 
+  };
 
   return (
     <div className="grid grid-cols-1 gap-12">
@@ -294,11 +402,14 @@ export default function AccountCreationForm() {
             </button>
           )}
 
-          { accountAddress && isBalanceChecked && parseInt(poapBalance) === 0 && (
-            <div className="mb-2 text-center font-medium text-red-600">
-              You don't have any POAPs. You need at least one to join the group.
-            </div>
-          )}
+          {accountAddress &&
+            isBalanceChecked &&
+            parseInt(poapBalance) === 0 && (
+              <div className="mb-2 text-center font-medium text-red-600">
+                You don't have any POAPs. You need at least one to join the
+                group.
+              </div>
+            )}
 
           {accountAddress && parseInt(poapBalance) > 0 && (
             <>
@@ -339,6 +450,22 @@ export default function AccountCreationForm() {
               )}
             </>
           )}
+
+          {accountAddress &&
+            isSemaphoreGroupAssigned &&
+            semaphoreGroupIdentity && (
+              <button
+                onClick={handleVoting}
+                disabled={!isKernelClientReady || isSendingUserOp}
+                className={`w-full px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
+                  isKernelClientReady && !isSendingUserOp
+                    ? "bg-pink-500 hover:bg-pink-700 focus:ring-pink-500"
+                    : "bg-gray-500"
+                }`}
+              >
+                {isSendingUserOp ? <div className="spinner"></div> : "Vote"}
+              </button>
+            )}
         </div>
       </div>
     </div>
