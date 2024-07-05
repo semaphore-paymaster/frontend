@@ -40,7 +40,7 @@ let sessionKeyAccount: any;
 let kernelClient: any;
 
 export default function AccountCreationForm() {
-  const [username, setUsername] = useState("user");
+  const [username, setUsername] = useState("semaphore-paymaster-account");
   const [accountAddress, setAccountAddress] = useState("");
   const [isKernelClientReady, setIsKernelClientReady] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -50,7 +50,9 @@ export default function AccountCreationForm() {
   const [userOpStatus, setUserOpStatus] = useState("");
   const [userOpCount, setUserOpCount] = useState(0);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
+  const [isBalanceChecked, setIsBalanceChecked] = useState(false);
   const [poapBalance, setPoapBalance] = useState("0");
+
 
   const [semaphorePrivateKey, setSemaphorePrivateKey] = useState<string | Uint8Array | Buffer | undefined>();
   const [semaphorePublicKey, setSemaphorePublicKey] = useState<
@@ -88,15 +90,28 @@ export default function AccountCreationForm() {
       entryPoint: ENTRYPOINT_ADDRESS_V07,
       middleware: {
         sponsorUserOperation: async ({ userOperation }) => {
+
           const zeroDevPaymaster = await createZeroDevPaymasterClient({
             chain: CHAIN,
             transport: http(PAYMASTER_URL),
             entryPoint: ENTRYPOINT_ADDRESS_V07,
           });
+
           return zeroDevPaymaster.sponsorUserOperation({
             userOperation,
             entryPoint: ENTRYPOINT_ADDRESS_V07,
           });
+
+          // if (userOperation.initCode !== "0x") {
+          //   // new account
+          // }
+          // // old account
+
+          // return {
+          //   ...userOperation,
+          //   paymaster: "0x....",
+          //   paymasterData: "0x.....",
+          // }
         },
       },
     });
@@ -199,6 +214,7 @@ export default function AccountCreationForm() {
 
     setPoapBalance(balance.toString());
     setIsCheckingBalance(false);
+    setIsBalanceChecked(true);
   };
 
 
@@ -278,25 +294,11 @@ export default function AccountCreationForm() {
             </button>
           )}
 
-          {/* {accountAddress && parseInt(poapBalance) > 0 && (
-            <button
-              onClick={async () =>
-                await joinSemaphoreGroup(accountAddress as `0x${string}`)
-              }
-              disabled={isLoggingIn || isRegistering || isCheckingBalance}
-              className={`w-full mb-10 px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
-                isKernelClientReady && !isSendingUserOp
-                  ? "bg-green-500 hover:bg-green-700 focus:ring-green-500"
-                  : "bg-gray-500"
-              }`}
-            >
-              {isCheckingBalance ? (
-                <div className="spinner"></div>
-              ) : (
-                "Join the Semaphore Group"
-              )}
-            </button>
-          )} */}
+          { accountAddress && isBalanceChecked && parseInt(poapBalance) === 0 && (
+            <div className="mb-2 text-center font-medium text-red-600">
+              You don't have any POAPs. You need at least one to join the group.
+            </div>
+          )}
 
           {accountAddress && parseInt(poapBalance) > 0 && (
             <>
