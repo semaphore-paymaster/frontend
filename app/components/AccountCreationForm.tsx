@@ -52,6 +52,7 @@ const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
 
 let sessionKeyAccount: any;
 let kernelClient: any;
+let semaphoreProof: any;
 
 export default function AccountCreationForm() {
   const [username, setUsername] = useState("semaphore-paymaster-account");
@@ -103,6 +104,9 @@ export default function AccountCreationForm() {
       account: sessionKeyAccount,
       chain: CHAIN,
       bundlerTransport: http(BUNDLER_URL),
+      // bundlerTransport: http(
+      //   "https://public.stackup.sh/api/v1/node/ethereum-sepolia"
+      // ),
       entryPoint: ENTRYPOINT_ADDRESS_V07,
       middleware: {
         sponsorUserOperation: async ({ userOperation }) => {
@@ -112,56 +116,50 @@ export default function AccountCreationForm() {
             entryPoint: ENTRYPOINT_ADDRESS_V07,
           });
 
-          console.log("data", data);
+          if (!userOperation.factory && semaphoreProof) {
+            const {
+              merkleTreeDepth,
+              merkleTreeRoot,
+              nullifier,
+              message,
+              scope,
+              points,
+            } = semaphoreProof;
 
-          // if (!userOperation.factory && data) {
-          //   console.log("test", "sponsorUserOperation");
-          //   console.log("userOperation ~", userOperation);
-          //   console.log("semaphoreGroupData ~", semaphoreGroupData);
+            const paymasterData = encodeAbiParameters(
+              parseAbiParameters(
+                "uint48, uint48, uint256, uint256, uint256, uint256, uint256, uint256[8]"
+              ),
 
-          //   const {
-          //     merkleTreeDepth,
-          //     merkleTreeRoot,
-          //     nullifier,
-          //     message,
-          //     scope,
-          //     points,
-          //   } = semaphoreGroupData;
+              [
+                0,
+                0,
+                merkleTreeDepth,
+                merkleTreeRoot,
+                nullifier,
+                message,
+                scope,
+                points,
+              ]
+            );
 
-          //   const encodedPoints = encodeAbiParameters(
-          //     parseAbiParameters(
-          //       "uint, uint, uint, uint, uint, uint, uint, uint"
-          //     ),
-          //     points.map((point: number) => BigInt(point))
-          //   );
+            // console.log("semaphoreProof", semaphoreProof);
+            // console.log("paymasterData", paymasterData);
+            // console.log("userOperation", userOperation);
 
-          //   const encodedSemaphoreData = encodeAbiParameters(
-          //     parseAbiParameters("uint, uint, uint, uint, uint, bytes"),
-          //     [
-          //       merkleTreeDepth,
-          //       merkleTreeRoot,
-          //       nullifier,
-          //       message,
-          //       scope,
-          //       encodedPoints,
-          //     ]
-          //   );
+            const result = {
+              ...userOperation,
+              paymaster: "0x94b8c54a73cba9f2b942d76f2b4ce318330e36d7",
+              paymasterData,
+              callGasLimit: 0x7a1200,
+              paymasterPostOpGasLimit: BigInt(9e18),
+              paymasterVerificationGasLimit: BigInt(9e18),
+              verificationGasLimit: 0x927c0,
+              preVerificationGas: 0x15f90,
+            };
 
-          //   const paymasterData = encodeAbiParameters(
-          //     [
-          //       { name: "validUntil", type: "uint48" },
-          //       { name: "validAfter", type: "uint48" },
-          //       { name: "signature", type: "bytes" },
-          //     ],
-          //     [0, 0, semaphoreGroupData]
-          //   );
-
-          //   return {
-          //     ...userOperation,
-          //     paymaster: 0x94b8c54a73cba9f2b942d76f2b4ce318330e36d7,
-          //     paymasterData,
-          //   };
-          // }
+            return result;
+          }
 
           return zeroDevPaymaster.sponsorUserOperation({
             userOperation,
@@ -279,23 +277,26 @@ export default function AccountCreationForm() {
 
   const handleVoting = async () => {
     if (semaphoreGroupIdentity) {
-        const semaphoreSubgraph = new SemaphoreSubgraph("sepolia");
-        const { members } = await semaphoreSubgraph.getGroup("3", {
-          members: true,
-        });
+        const semaphoreSubgraph = new SemaphoreSubgraph(
+          "https://api.studio.thegraph.com/query/65978/sesmaphore-paymaster/0.0.1"
+        );
+        const groupResponse = await semaphoreSubgraph.getGroup(
+          process.env.NEXT_PUBLIC_SEMAPHORE_GROUP_ID as string,
+          {
+            members: true,
+          }
+        );
 
-        const group = new Group(members);
-        const scope = group.root;
-        const message = 1;
+        const group = new Group(groupResponse.members);
 
         const proof = await generateProof(
           semaphoreGroupIdentity,
           group,
-          message,
-          scope
+          0,
+          0
         );
-         
-        semaphoreGroupData = group;
+
+        semaphoreProof = proof;
 
         const callData = await kernelClient.account.encodeCallData({
           to: process.env.NEXT_PUBLIC_STORAGE_CONTRACT,
@@ -306,9 +307,6 @@ export default function AccountCreationForm() {
             args: [6],
           }),
         });
-
-
-        console.log("proof", proof);
 
         setIsSendingUserOp(true);
 
