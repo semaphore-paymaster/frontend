@@ -431,7 +431,7 @@ export default function AccountCreationForm() {
             isBalanceChecked &&
             parseInt(poapBalance) === 0 && (
               <div className="mb-2 text-center font-medium text-red-600">
-                You don't have any POAPs. You need at least one to join the
+                You do not have any POAPs. You need at least one to join the
                 group.
               </div>
             )}
