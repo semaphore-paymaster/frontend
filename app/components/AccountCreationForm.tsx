@@ -10,19 +10,28 @@ import {
   toPasskeyValidator,
   toWebAuthnKey,
 } from "@zerodev/passkey-validator";
+
+import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
+
 import { toPermissionValidator } from "@zerodev/permissions";
 import { toECDSASigner } from "@zerodev/permissions/signers";
 import { toSudoPolicy } from "@zerodev/permissions/policies";
-import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless";
+import {
+  bundlerActions,
+  ENTRYPOINT_ADDRESS_V07,
+  walletClientToSmartAccountSigner,
+} from "permissionless";
+
 import React, { useState } from "react";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { http, encodeFunctionData } from "viem";
-import { encodeAbiParameters } from "viem";
-import { parseAbiParameters } from "viem";
-
-
-
-
+import {
+  http,
+  encodeFunctionData,
+  createPublicClient,
+  encodeAbiParameters,
+  parseAbiParameters,
+  type Address,
+} from "viem";
 
 import { Identity } from "@semaphore-protocol/identity";
 
@@ -31,7 +40,6 @@ import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
 import { SemaphoreSubgraph } from "@semaphore-protocol/data";
 import { generateProof } from "@semaphore-protocol/proof";
 import { Group } from "@semaphore-protocol/group";
-
 
 
 import {
@@ -46,6 +54,11 @@ import { GATEKEEPER_ABI } from "../config/gatekeeper";
 import { STORAGE_ABI } from "../config/storage";
 import { GET_GROUP_DATA } from "../config/apollo";
 import { useQuery } from "@apollo/client";
+// import { walletClient } from "../config/walletClient";
+
+import { useWalletClient } from "wagmi";
+import { WalletOptions } from "./WalletOptions";
+
 
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
@@ -69,17 +82,34 @@ export default function AccountCreationForm() {
   const [poapBalance, setPoapBalance] = useState("0");
   const [isSemaphoreGroupAssigned, setIsSemaphoreGroupAssigned] = useState(false);
   const [semaphoreGroupIdentity, setSemaphoreGroupIdentity] = useState<Identity>();
-  const { loading, error, data } = useQuery(GET_GROUP_DATA);
-
+  // const { loading, error, data } = useQuery(GET_GROUP_DATA); // Data from subgraph, not being used anymore.
   const [semaphorePrivateKey, setSemaphorePrivateKey] = useState<string | Uint8Array | Buffer | undefined>();
   const [semaphorePublicKey, setSemaphorePublicKey] = useState<
     string | Uint8Array | Buffer | undefined
   >();
 
+  const [account, setAccount] = useState<Address>();
+  const walletClient = useWalletClient();
 
-  const createAccountAndClient = async (passkeyValidator: any) => {
+  const createAccountAndClient = async () => {
+
+    const smartAccountSigner = walletClientToSmartAccountSigner(walletClient);
+
+    const publicClient = createPublicClient({
+      transport: http("https://eth-sepolia.g.alchemy.com/v2/demo"),
+    });
+
+    console.log("smartAccountSigner", smartAccountSigner);
+
+    // Pass your `smartAccountSigner` to the validator
+    const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
+      signer: smartAccountSigner,
+      entryPoint: ENTRYPOINT_ADDRESS_V07,
+      kernelVersion: KERNEL_V3_1,
+    });
+
     const ecdsaSigner = await toECDSASigner({
-      signer: sessionKeySigner,
+      signer: smartAccountSigner,
     });
 
     const sudoPolicy = await toSudoPolicy({});
@@ -95,7 +125,7 @@ export default function AccountCreationForm() {
       entryPoint: ENTRYPOINT_ADDRESS_V07,
       kernelVersion: KERNEL_V3_1,
       plugins: {
-        sudo: passkeyValidator,
+        sudo: ecdsaValidator,
         regular: permissionValidator,
       },
     });
@@ -176,19 +206,7 @@ export default function AccountCreationForm() {
   const handleRegister = async () => {
     setIsRegistering(true);
 
-    const webAuthnKey = await toWebAuthnKey({
-      passkeyName: username,
-      passkeyServerUrl: PASSKEY_SERVER_URL,
-      mode: WebAuthnMode.Register,
-    });
-
-    const passkeyValidator = await toPasskeyValidator(publicClient, {
-      webAuthnKey,
-      entryPoint: ENTRYPOINT_ADDRESS_V07,
-      kernelVersion: KERNEL_V3_1,
-    });
-
-    await createAccountAndClient(passkeyValidator);
+    await createAccountAndClient();
 
     setIsRegistering(false);
   };
@@ -196,19 +214,19 @@ export default function AccountCreationForm() {
   const handleLogin = async () => {
     setIsLoggingIn(true);
 
-    const webAuthnKey = await toWebAuthnKey({
-      passkeyName: username,
-      passkeyServerUrl: PASSKEY_SERVER_URL,
-      mode: WebAuthnMode.Login,
-    });
+    // const webAuthnKey = await toWebAuthnKey({
+    //   passkeyName: username,
+    //   passkeyServerUrl: PASSKEY_SERVER_URL,
+    //   mode: WebAuthnMode.Login,
+    // });
 
-    const passkeyValidator = await toPasskeyValidator(publicClient, {
-      webAuthnKey,
-      entryPoint: ENTRYPOINT_ADDRESS_V07,
-      kernelVersion: KERNEL_V3_1,
-    });
+    // const passkeyValidator = await toPasskeyValidator(publicClient, {
+    //   webAuthnKey,
+    //   entryPoint: ENTRYPOINT_ADDRESS_V07,
+    //   kernelVersion: KERNEL_V3_1,
+    // });
 
-    await createAccountAndClient(passkeyValidator);
+    // await createAccountAndClient(passkeyValidator);
 
     setIsLoggingIn(false);
   };
@@ -327,6 +345,9 @@ export default function AccountCreationForm() {
   return (
     <div className="grid grid-cols-1 gap-12">
       <div className="flex flex-col">
+        <div className="grid grid-cols-1 gap-4 mb-4">
+         {/* <WalletOptions /> */}
+        </div>
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             {/* <input
