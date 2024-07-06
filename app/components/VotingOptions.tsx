@@ -9,7 +9,6 @@ export default function VotingOptions({
   setIsFirstOptionSelected,
   isFirstOptionSelected,
 }: VotingOptionsProps) {
-
   const onClick = () => {
     setIsFirstOptionSelected(!isFirstOptionSelected);
   };
@@ -19,6 +18,7 @@ export default function VotingOptions({
       <div className="grid w-[30rem] grid-cols-2 gap-2 rounded-xl bg-black p-2 border">
         <div>
           <input
+            readOnly
             type="radio"
             name="option"
             id="1"
@@ -37,6 +37,7 @@ export default function VotingOptions({
 
         <div>
           <input
+            readOnly
             type="radio"
             name="option"
             id="2"
