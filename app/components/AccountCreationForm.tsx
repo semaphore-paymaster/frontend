@@ -27,6 +27,7 @@ import { SemaphoreSubgraph } from "@semaphore-protocol/data";
 import { generateProof } from "@semaphore-protocol/proof";
 import { Group } from "@semaphore-protocol/group";
 
+
 import {
   BUNDLER_URL,
   CHAIN,
@@ -40,6 +41,7 @@ import { STORAGE_ABI } from "../config/storage";
 import { GET_GROUP_DATA } from "../config/apollo";
 import { useQuery } from "@apollo/client";
 import Login from "./Login";
+import AddressAvatar from "./AddressAvatar";
 
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
@@ -372,19 +374,7 @@ export default function AccountCreationForm() {
         )}
 
         <div className="border-t-2 pt-4">
-          {accountAddress && (
-            <div className="mb-2 text-center font-medium">
-              Account Address:{" "}
-              <a
-                href={`https://jiffyscan.xyz/account/${accountAddress}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-blue-700"
-              >
-                {accountAddress}
-              </a>
-            </div>
-          )}
+          {accountAddress &&  <AddressAvatar accountAddress={accountAddress} />}
           {accountAddress && parseInt(poapBalance) > 0 && (
             <div className="mb-2 text-center font-medium">
               Can I join the group?:{" "}
@@ -395,7 +385,7 @@ export default function AccountCreationForm() {
               </span>
             </div>
           )}
-          {accountAddress && (
+          {accountAddress && !isBalanceChecked && (
             <button
               onClick={async () =>
                 await checkPoapBalance(accountAddress as `0x${string}`)

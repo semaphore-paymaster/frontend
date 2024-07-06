@@ -24,13 +24,13 @@ export default function Login({
         />
         </div>
         <div className="h-full flex flex-col justify-end">
-            <Button
-                color="pink"
-                isLoading={isLoggingIn || isRegistering}
-                handleRegister={handleLogin}
-                label="Login"
-            />
-      </div>
+        <Button
+            color="pink"
+            isLoading={isLoggingIn || isRegistering}
+            handleRegister={handleLogin}
+            label="Login"
+        />
+        </div>
     </div>
   );
 }
