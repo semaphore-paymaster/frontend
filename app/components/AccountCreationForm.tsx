@@ -65,6 +65,7 @@ const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
 let sessionKeyAccount: any;
 let kernelClient: any;
 let semaphoreProof: any;
+let bundlerClient: any;
 
 export default function AccountCreationForm() {
   const [username, setUsername] = useState("semaphore-paymaster-account");
@@ -185,27 +186,59 @@ export default function AccountCreationForm() {
           //////////////////////////////////////////////////////////////
           // ** Enable this if you want to use the custom Paymaster **
           ////////////////////////////////////////////////////////////////
-          // if (!userOperation.factory && semaphoreProof) {
+          if (!userOperation.factory && semaphoreProof) {
+            const {
+              merkleTreeDepth,
+              merkleTreeRoot,
+              nullifier,
+              message,
+              scope,
+              points,
+            } = semaphoreProof;
 
-          //   const paymasterData = encodeSemaphoreProof(semaphoreProof)
+            const paymasterData = encodeAbiParameters(
+              parseAbiParameters(
+                "uint256, uint256, uint256, uint256, uint256, uint256[8]"
+              ),
+              [
+                merkleTreeDepth,
+                merkleTreeRoot,
+                nullifier,
+                message,
+                scope,
+                points,
+              ]
+            );
 
-          //   // console.log("semaphoreProof", semaphoreProof);
-          //   // console.log("paymasterData", paymasterData);
-          //   // console.log("userOperation", userOperation);
+            console.log("semaphoreProof", semaphoreProof);
+            console.log("proof: ", await verifyProof(semaphoreProof));
+            console.log("paymasterData", paymasterData);
+            console.log("userOperation", userOperation);
 
-          //   const result = {
-          //     ...userOperation,
-          //     paymaster: "0x94b8c54a73cba9f2b942d76f2b4ce318330e36d7",
-          //     paymasterData,
-          //     callGasLimit: 0x7a1200,
-          //     paymasterPostOpGasLimit: BigInt(9e18),
-          //     paymasterVerificationGasLimit: BigInt(9e18),
-          //     verificationGasLimit: 0x927c0,
-          //     preVerificationGas: 0x15f90,
-          //   };
+            const userOpWithPaymasterData = {
+              ...userOperation,
+              paymaster: process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT,
+              paymasterData,
+            };
 
-          //   return result;
-          // }
+            console.log(
+              "userOpWithPaymasterData",
+              userOpWithPaymasterData
+            );
+
+            const gas = await bundlerClient.estimateUserOperationGas({
+              userOperation: userOpWithPaymasterData,
+              entryPoint: ENTRYPOINT_ADDRESS_V07,
+            });
+
+            const result = {
+              ...userOpWithPaymasterData,
+              ...gas,
+            };
+            console.log("results: ", result);
+
+            return result;
+          }
 
           return zeroDevPaymaster.sponsorUserOperation({
             userOperation,
@@ -298,7 +331,7 @@ export default function AccountCreationForm() {
 
       setUserOpHash(userOpHash);
 
-      const bundlerClient = kernelClient.extend(
+      bundlerClient = kernelClient.extend(
         bundlerActions(ENTRYPOINT_ADDRESS_V07)
       );
       await bundlerClient.waitForUserOperationReceipt({
@@ -415,7 +448,7 @@ export default function AccountCreationForm() {
           "0x0000000000000000000000000000000000000000000000000000000000000000";
 
         const callData = await kernelClient.account.encodeCallData({
-          to: "0x7f660c14e28C4ecbfa2392E32783887f8756f7C8",
+          to: "0xf77429Bd73EEEe4fA5aCb501D6FD0232b35b47Ce",
           value: BigInt(0),
           data: encodeFunctionData({
             abi: MACI_FACTORY_ABI,
@@ -453,7 +486,7 @@ export default function AccountCreationForm() {
         setVotingPercentage(43);
 
         const stateIndexData = await publicClient.readContract({
-          address: "0x7f660c14e28C4ecbfa2392E32783887f8756f7C8",
+          address: "0xf77429Bd73EEEe4fA5aCb501D6FD0232b35b47Ce",
           abi: MACI_FACTORY_ABI,
           functionName: "numSignUps",
         });
@@ -518,7 +551,7 @@ export default function AccountCreationForm() {
 
 
         const voteCallData = await kernelClient.account.encodeCallData({
-          to: "0xA4af2fC4133FC5Fb2D92e7DF32eE378b9EA4A66F",
+          to: "0xD841DC0D7A487a4C45883A3c2F22B76d920f6331",
           value: BigInt(0),
           data: encodeFunctionData({
             abi: MACI_POLL_ABI,
@@ -631,7 +664,7 @@ export default function AccountCreationForm() {
                   label="Vote"
                   isLoading={isVoting}
                   disabled={!isKernelClientReady || isVoting}
-                  // handleRegister={vote}
+                  //handleRegister={vote}
                   handleRegister={maciVote}
                   color="pink"
                 />
