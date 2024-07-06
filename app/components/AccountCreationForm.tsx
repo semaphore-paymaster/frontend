@@ -19,12 +19,15 @@ import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
 
 import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless";
 
+
+import { encodeAbiParameters } from "viem";
+import { parseAbiParameters } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { http, encodeFunctionData } from "viem";
 
 import { Identity } from "@semaphore-protocol/identity";
 import { SemaphoreSubgraph } from "@semaphore-protocol/data";
-import { generateProof } from "@semaphore-protocol/proof";
+import { generateProof, verifyProof } from "@semaphore-protocol/proof";
 import { Group } from "@semaphore-protocol/group";
 
 
@@ -55,6 +58,7 @@ const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
 let sessionKeyAccount: any;
 let kernelClient: any;
 let semaphoreProof: any;
+let bundlerClient: any;
 
 export default function AccountCreationForm() {
   const [username, setUsername] = useState("semaphore-paymaster-account");
@@ -124,50 +128,55 @@ export default function AccountCreationForm() {
           //////////////////////////////////////////////////////////////
           // ** Enable this if you want to use the custom Paymaster **
           ////////////////////////////////////////////////////////////////
-          // if (!userOperation.factory && semaphoreProof) {
-          //   const {
-          //     merkleTreeDepth,
-          //     merkleTreeRoot,
-          //     nullifier,
-          //     message,
-          //     scope,
-          //     points,
-          //   } = semaphoreProof;
+          if (!userOperation.factory && semaphoreProof) {
+            const {
+              merkleTreeDepth,
+              merkleTreeRoot,
+              nullifier,
+              message,
+              scope,
+              points,
+            } = semaphoreProof;
 
-          //   const paymasterData = encodeAbiParameters(
-          //     parseAbiParameters(
-          //       "uint48, uint48, uint256, uint256, uint256, uint256, uint256, uint256[8]"
-          //     ),
+            const paymasterData = encodeAbiParameters(
+              parseAbiParameters(
+                "uint256, uint256, uint256, uint256, uint256, uint256[8]"
+              ),
+              [
+                merkleTreeDepth,
+                merkleTreeRoot,
+                nullifier,
+                message,
+                scope,
+                points,
+              ]
+            );
 
-          //     [
-          //       0,
-          //       0,
-          //       merkleTreeDepth,
-          //       merkleTreeRoot,
-          //       nullifier,
-          //       message,
-          //       scope,
-          //       points,
-          //     ]
-          //   );
+            console.log("semaphoreProof", semaphoreProof);
+            console.log("proof: ", await verifyProof(semaphoreProof));
+            console.log("paymasterData", paymasterData);
+            console.log("userOperation", userOperation);
 
-          //   // console.log("semaphoreProof", semaphoreProof);
-          //   // console.log("paymasterData", paymasterData);
-          //   // console.log("userOperation", userOperation);
+            const userOpWithPaymasterData = {
+              ...userOperation,
+              paymaster: process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT,
+              paymasterData,
+            };
+            console.log("userOpWithPaymasterData", userOpWithPaymasterData);
+            
+            const gas = await bundlerClient.estimateUserOperationGas({
+              userOperation: userOpWithPaymasterData,
+              entryPoint: ENTRYPOINT_ADDRESS_V07,
+            });
 
-          //   const result = {
-          //     ...userOperation,
-          //     paymaster: "0x94b8c54a73cba9f2b942d76f2b4ce318330e36d7",
-          //     paymasterData,
-          //     callGasLimit: 0x7a1200,
-          //     paymasterPostOpGasLimit: BigInt(9e18),
-          //     paymasterVerificationGasLimit: BigInt(9e18),
-          //     verificationGasLimit: 0x927c0,
-          //     preVerificationGas: 0x15f90,
-          //   };
+            const result = {
+              ...userOpWithPaymasterData,
+              ...gas,
+            }
+            console.log("results: ", result);          
 
-          //   return result;
-          // }
+            return result;
+          }
 
           return zeroDevPaymaster.sponsorUserOperation({
             userOperation,
@@ -176,6 +185,10 @@ export default function AccountCreationForm() {
         },
       },
     });
+
+    bundlerClient = kernelClient.extend(
+      bundlerActions(ENTRYPOINT_ADDRESS_V07)
+    );
 
     setIsKernelClientReady(true);
     setAccountAddress(sessionKeyAccount.address);
@@ -260,9 +273,6 @@ export default function AccountCreationForm() {
 
       setUserOpHash(userOpHash);
 
-      const bundlerClient = kernelClient.extend(
-        bundlerActions(ENTRYPOINT_ADDRESS_V07)
-      );
       await bundlerClient.waitForUserOperationReceipt({
         hash: userOpHash,
       });
@@ -332,7 +342,6 @@ export default function AccountCreationForm() {
         const userOpHash = await kernelClient.sendUserOperation({
           userOperation: {
             callData,
-
           },
         });
 
