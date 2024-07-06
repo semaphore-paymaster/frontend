@@ -18,15 +18,17 @@ export default function Login({
         <div>
         <Button
             color="blue"
-            isLoading={isRegistering || isLoggingIn}
+            isLoading={isRegistering}
+            disabled={isLoggingIn}
             handleRegister={handleRegister}
             label="Register"
         />
         </div>
         <div className="h-full flex flex-col justify-end">
         <Button
+            disabled={isRegistering}
             color="pink"
-            isLoading={isLoggingIn || isRegistering}
+            isLoading={isLoggingIn}
             handleRegister={handleLogin}
             label="Login"
         />

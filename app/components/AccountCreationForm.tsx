@@ -42,6 +42,7 @@ import { GET_GROUP_DATA } from "../config/apollo";
 import { useQuery } from "@apollo/client";
 import Login from "./Login";
 import AddressAvatar from "./AddressAvatar";
+import Button from "./Button";
 
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
@@ -302,13 +303,12 @@ export default function AccountCreationForm() {
 
     setUserOpCount(userOpCount + 1);
 
-    // Update the message based on the count of UserOps
-    const userOpMessage =
-      userOpCount === 0
-        ? `First UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Now try sending another UserOp.`
-        : `UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Notice how this UserOp costs a lot less gas and requires no prompting.`;
+    const userOpMessage = `Vote submitted. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-200 hover:text-blue-700">Click here to view more details.</a>`;
 
-    setUserOpStatus(userOpMessage);
+    if (userOpHash) {
+      setUserOpStatus(userOpMessage);
+    }
+   
     setIsVoting(false);
   };
 
@@ -349,12 +349,13 @@ export default function AccountCreationForm() {
 
     setUserOpCount(userOpCount + 1);
 
-    const userOpMessage =
-      userOpCount === 0
-        ? `First UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Now try sending another UserOp.`
-        : `UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Notice how this UserOp costs a lot less gas and requires no prompting.`;
+    const userOpMessage = `You are now part of the group. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view more details.</a>`
+      
 
-    setUserOpStatus(userOpMessage);
+    if (userOpHash) {
+       setUserOpStatus(userOpMessage);
+    }
+   
     setIsSemaphoreGroupAssigned(true);
     setSemaphoreGroupIdentity(identity);
     setIsJoiningSemaphoreGroup(false);
@@ -373,36 +374,27 @@ export default function AccountCreationForm() {
           />
         )}
 
-        <div className="border-t-2 pt-4">
-          {accountAddress &&  <AddressAvatar accountAddress={accountAddress} />}
+        <div className="pt-4">
+          {accountAddress && <AddressAvatar accountAddress={accountAddress} />}
           {accountAddress && parseInt(poapBalance) > 0 && (
             <div className="mb-2 text-center font-medium">
-              Can I join the group?:{" "}
               <span>
                 {parseInt(poapBalance) > 0
-                  ? "Yes!"
+                  ? "You are eligible! 🎉"
                   : "Unfortunately you are not eligible"}
               </span>
             </div>
           )}
           {accountAddress && !isBalanceChecked && (
-            <button
-              onClick={async () =>
+            <Button
+              label="Check Eligibility"
+              isLoading={isCheckingBalance}
+              disabled={isLoggingIn || isRegistering || isCheckingBalance}
+              handleRegister={async () =>
                 await checkPoapBalance(accountAddress as `0x${string}`)
               }
-              disabled={isLoggingIn || isRegistering || isCheckingBalance}
-              className={`w-full mb-10 px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
-                isKernelClientReady && !isJoiningSemahoreGroup
-                  ? "bg-red-500 hover:bg-red-700 focus:ring-red-500"
-                  : "bg-gray-500"
-              }`}
-            >
-              {isCheckingBalance ? (
-                <div className="spinner"></div>
-              ) : (
-                "Check Eligibility"
-              )}
-            </button>
+              color="red"
+            />
           )}
 
           {accountAddress &&
@@ -414,50 +406,43 @@ export default function AccountCreationForm() {
               </div>
             )}
 
-          {accountAddress && parseInt(poapBalance) > 0 && (
+          {userOpHash && (
             <>
-              <button
-                onClick={joinSemaphoreGroup}
-                disabled={!isKernelClientReady || isJoiningSemahoreGroup}
-                className={`w-full px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
-                  isKernelClientReady && !isJoiningSemahoreGroup
-                    ? "bg-green-500 hover:bg-green-700 focus:ring-green-500"
-                    : "bg-gray-500"
-                }`}
-              >
-                {isJoiningSemahoreGroup ? (
-                  <div className="spinner"></div>
-                ) : (
-                  "Join the group"
-                )}
-              </button>
-              {userOpHash && (
-                <>
-                  <div
-                    className="mt-2 text-center"
-                    dangerouslySetInnerHTML={{
-                      __html: userOpStatus,
-                    }}
-                  />
-                </>
-              )}
+              <div
+                className="mt-2 text-center"
+                dangerouslySetInnerHTML={{
+                  __html: userOpStatus,
+                }}
+              />
             </>
           )}
 
           {accountAddress &&
+            parseInt(poapBalance) > 0 &&
+            !semaphoreGroupIdentity && (
+              <div className="my-4">
+                <Button
+                  label="Join the group"
+                  isLoading={isJoiningSemahoreGroup}
+                  disabled={!isKernelClientReady || isJoiningSemahoreGroup}
+                  handleRegister={joinSemaphoreGroup}
+                  color="green"
+                />
+              </div>
+            )}
+
+          {accountAddress &&
             isSemaphoreGroupAssigned &&
             semaphoreGroupIdentity && (
-              <button
-                onClick={vote}
-                disabled={!isKernelClientReady || isVoting}
-                className={`w-full px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
-                  isKernelClientReady && !isVoting
-                    ? "bg-pink-500 hover:bg-pink-700 focus:ring-pink-500"
-                    : "bg-gray-500"
-                }`}
-              >
-                {isVoting ? <div className="spinner"></div> : "Vote"}
-              </button>
+              <div className="mb-2 text-center font-medium">
+                <Button
+                  label="Vote"
+                  isLoading={isVoting}
+                  disabled={!isKernelClientReady || isVoting}
+                  handleRegister={vote}
+                  color="pink"
+                />
+              </div>
             )}
         </div>
       </div>
