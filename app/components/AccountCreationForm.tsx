@@ -524,7 +524,7 @@ export default function AccountCreationForm() {
 
          // create the command object
          const command: PCommand = new PCommand(
-           BigInt(stateIndex),
+           BigInt(stateIndex <= 0 ? 0 : stateIndex - 1),
            registerPubKey,
            BigInt(voteOptionIndex),
            BigInt(newVoteWeight),
