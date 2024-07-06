@@ -104,9 +104,6 @@ export default function AccountCreationForm() {
       account: sessionKeyAccount,
       chain: CHAIN,
       bundlerTransport: http(BUNDLER_URL),
-      // bundlerTransport: http(
-      //   "https://public.stackup.sh/api/v1/node/ethereum-sepolia"
-      // ),
       entryPoint: ENTRYPOINT_ADDRESS_V07,
       middleware: {
         sponsorUserOperation: async ({ userOperation }) => {
@@ -116,50 +113,53 @@ export default function AccountCreationForm() {
             entryPoint: ENTRYPOINT_ADDRESS_V07,
           });
 
-          if (!userOperation.factory && semaphoreProof) {
-            const {
-              merkleTreeDepth,
-              merkleTreeRoot,
-              nullifier,
-              message,
-              scope,
-              points,
-            } = semaphoreProof;
+          //////////////////////////////////////////////////////////////
+          // ** Enable this if you want to use the custom Paymaster **
+          ////////////////////////////////////////////////////////////////
+          // if (!userOperation.factory && semaphoreProof) {
+          //   const {
+          //     merkleTreeDepth,
+          //     merkleTreeRoot,
+          //     nullifier,
+          //     message,
+          //     scope,
+          //     points,
+          //   } = semaphoreProof;
 
-            const paymasterData = encodeAbiParameters(
-              parseAbiParameters(
-                "uint48, uint48, uint256, uint256, uint256, uint256, uint256, uint256[8]"
-              ),
+          //   const paymasterData = encodeAbiParameters(
+          //     parseAbiParameters(
+          //       "uint48, uint48, uint256, uint256, uint256, uint256, uint256, uint256[8]"
+          //     ),
 
-              [
-                0,
-                0,
-                merkleTreeDepth,
-                merkleTreeRoot,
-                nullifier,
-                message,
-                scope,
-                points,
-              ]
-            );
+          //     [
+          //       0,
+          //       0,
+          //       merkleTreeDepth,
+          //       merkleTreeRoot,
+          //       nullifier,
+          //       message,
+          //       scope,
+          //       points,
+          //     ]
+          //   );
 
-            // console.log("semaphoreProof", semaphoreProof);
-            // console.log("paymasterData", paymasterData);
-            // console.log("userOperation", userOperation);
+          //   // console.log("semaphoreProof", semaphoreProof);
+          //   // console.log("paymasterData", paymasterData);
+          //   // console.log("userOperation", userOperation);
 
-            const result = {
-              ...userOperation,
-              paymaster: "0x94b8c54a73cba9f2b942d76f2b4ce318330e36d7",
-              paymasterData,
-              callGasLimit: 0x7a1200,
-              paymasterPostOpGasLimit: BigInt(9e18),
-              paymasterVerificationGasLimit: BigInt(9e18),
-              verificationGasLimit: 0x927c0,
-              preVerificationGas: 0x15f90,
-            };
+          //   const result = {
+          //     ...userOperation,
+          //     paymaster: "0x94b8c54a73cba9f2b942d76f2b4ce318330e36d7",
+          //     paymasterData,
+          //     callGasLimit: 0x7a1200,
+          //     paymasterPostOpGasLimit: BigInt(9e18),
+          //     paymasterVerificationGasLimit: BigInt(9e18),
+          //     verificationGasLimit: 0x927c0,
+          //     preVerificationGas: 0x15f90,
+          //   };
 
-            return result;
-          }
+          //   return result;
+          // }
 
           return zeroDevPaymaster.sponsorUserOperation({
             userOperation,
@@ -213,55 +213,7 @@ export default function AccountCreationForm() {
     setIsLoggingIn(false);
   };
 
-  const handleSendUserOp = async () => {
-    setIsSendingUserOp(true);
-    setUserOpStatus("Joining...");
 
-    const identity = new Identity();
-    const {
-      privateKey, publicKey, commitment
-    } = identity;
-
-    const callData = await kernelClient.account.encodeCallData({
-      to: process.env.NEXT_PUBLIC_GATEKEEPER_CONTRACT,
-      value: BigInt(0),
-      data: encodeFunctionData({
-        abi: GATEKEEPER_ABI,
-        functionName: "enter",
-        args: [0, commitment],
-      }),
-    });
-
-    const userOpHash = await kernelClient.sendUserOperation({
-      userOperation: {
-        callData
-      },
-    });
-
-    setSemaphorePrivateKey(privateKey);
-    setSemaphorePublicKey(publicKey.toString());
-
-    setUserOpHash(userOpHash);
-
-    const bundlerClient = kernelClient.extend(
-      bundlerActions(ENTRYPOINT_ADDRESS_V07)
-    );
-    await bundlerClient.waitForUserOperationReceipt({
-      hash: userOpHash,
-    });
-
-    setUserOpCount(userOpCount + 1);
-
-    const userOpMessage =
-      userOpCount === 0
-        ? `First UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Now try sending another UserOp.`
-        : `UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Notice how this UserOp costs a lot less gas and requires no prompting.`;
-
-    setUserOpStatus(userOpMessage);
-    setIsSendingUserOp(false);  
-    setIsSemaphoreGroupAssigned(true);
-    setSemaphoreGroupIdentity(identity);
-  };
 
   const checkPoapBalance = async (account: `0x${string}`) => {
     setIsCheckingBalance(true);
@@ -317,11 +269,96 @@ export default function AccountCreationForm() {
           },
         });
 
+        console.log("userOpHash", userOpHash);
+
 
         setIsSendingUserOp(false);
-
-        console.log("userOpHash", userOpHash);
     } 
+  };
+
+  const fakeHandlingVoting = async () => {
+    setIsSendingUserOp(true);
+    setUserOpStatus("Sending UserOp...");
+    console.log("Sending userop with username:", username);
+
+    const userOpHash = await kernelClient.sendUserOperation({
+      userOperation: {
+        callData: await sessionKeyAccount.encodeCallData({
+          to: "0x0000000000000000000000000000000000000000",
+          value: BigInt(0),
+          data: "0x",
+        }),
+      },
+    });
+
+    setUserOpHash(userOpHash);
+    console.log("waiting for userOp:", userOpHash);
+
+    const bundlerClient = kernelClient.extend(
+      bundlerActions(ENTRYPOINT_ADDRESS_V07)
+    );
+    await bundlerClient.waitForUserOperationReceipt({
+      hash: userOpHash,
+    });
+
+    setUserOpCount(userOpCount + 1);
+
+    // Update the message based on the count of UserOps
+    const userOpMessage =
+      userOpCount === 0
+        ? `First UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Now try sending another UserOp.`
+        : `UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Notice how this UserOp costs a lot less gas and requires no prompting.`;
+
+    setUserOpStatus(userOpMessage);
+    setIsSendingUserOp(false);
+  };
+
+  const handleSendUserOp = async () => {
+    setIsSendingUserOp(true);
+    setUserOpStatus("Joining...");
+
+    const identity = new Identity();
+    const { privateKey, publicKey, commitment } = identity;
+
+    const callData = await kernelClient.account.encodeCallData({
+      to: process.env.NEXT_PUBLIC_GATEKEEPER_CONTRACT,
+      value: BigInt(0),
+      data: encodeFunctionData({
+        abi: GATEKEEPER_ABI,
+        functionName: "enter",
+        args: [0, commitment],
+      }),
+    });
+
+    const userOpHash = await kernelClient.sendUserOperation({
+      userOperation: {
+        callData,
+      },
+    });
+
+    setSemaphorePrivateKey(privateKey);
+    setSemaphorePublicKey(publicKey.toString());
+
+    setUserOpHash(userOpHash);
+
+    const bundlerClient = kernelClient.extend(
+      bundlerActions(ENTRYPOINT_ADDRESS_V07)
+    );
+    await bundlerClient.waitForUserOperationReceipt({
+      hash: userOpHash,
+    });
+
+    setUserOpCount(userOpCount + 1);
+
+    const userOpMessage =
+      userOpCount === 0
+        ? `First UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Now try sending another UserOp.`
+        : `UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Notice how this UserOp costs a lot less gas and requires no prompting.`;
+
+    setUserOpStatus(userOpMessage);
+    setIsSendingUserOp(false);
+    setIsSemaphoreGroupAssigned(true);
+    setSemaphoreGroupIdentity(identity);
   };
 
   return (
@@ -434,16 +471,6 @@ export default function AccountCreationForm() {
                       __html: userOpStatus,
                     }}
                   />
-
-                  <div>
-                    <strong>Please keep these values in a safe place.</strong>
-                    <div>
-                      Private Key: <pre>{semaphorePrivateKey}</pre>
-                    </div>
-                    <div>
-                      Public Key: <pre>{semaphorePublicKey}</pre>
-                    </div>
-                  </div>
                 </>
               )}
             </>
@@ -453,6 +480,7 @@ export default function AccountCreationForm() {
             isSemaphoreGroupAssigned &&
             semaphoreGroupIdentity && (
               <button
+                // onClick={handleVoting}
                 onClick={handleVoting}
                 disabled={!isKernelClientReady || isSendingUserOp}
                 className={`w-full px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
