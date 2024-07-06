@@ -1,5 +1,7 @@
 "use client";
 
+import React, { useState } from "react";
+
 import {
   createKernelAccount,
   createKernelAccountClient,
@@ -13,26 +15,17 @@ import {
 import { toPermissionValidator } from "@zerodev/permissions";
 import { toECDSASigner } from "@zerodev/permissions/signers";
 import { toSudoPolicy } from "@zerodev/permissions/policies";
-import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless";
-import React, { useState } from "react";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { http, encodeFunctionData } from "viem";
-import { encodeAbiParameters } from "viem";
-import { parseAbiParameters } from "viem";
-
-
-
-
-
-import { Identity } from "@semaphore-protocol/identity";
-
 import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
 
+import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless";
+
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { http, encodeFunctionData } from "viem";
+
+import { Identity } from "@semaphore-protocol/identity";
 import { SemaphoreSubgraph } from "@semaphore-protocol/data";
 import { generateProof } from "@semaphore-protocol/proof";
 import { Group } from "@semaphore-protocol/group";
-
-
 
 import {
   BUNDLER_URL,
@@ -56,11 +49,16 @@ let semaphoreProof: any;
 
 export default function AccountCreationForm() {
   const [username, setUsername] = useState("semaphore-paymaster-account");
+
   const [accountAddress, setAccountAddress] = useState("");
   const [isKernelClientReady, setIsKernelClientReady] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isSendingUserOp, setIsSendingUserOp] = useState(false);
+
+  
+  const [isJoiningSemahoreGroup, setIsJoiningSemaphoreGroup] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
+  
   const [userOpHash, setUserOpHash] = useState("");
   const [userOpStatus, setUserOpStatus] = useState("");
   const [userOpCount, setUserOpCount] = useState(0);
@@ -69,7 +67,6 @@ export default function AccountCreationForm() {
   const [poapBalance, setPoapBalance] = useState("0");
   const [isSemaphoreGroupAssigned, setIsSemaphoreGroupAssigned] = useState(false);
   const [semaphoreGroupIdentity, setSemaphoreGroupIdentity] = useState<Identity>();
-  const { loading, error, data } = useQuery(GET_GROUP_DATA);
 
   const [semaphorePrivateKey, setSemaphorePrivateKey] = useState<string | Uint8Array | Buffer | undefined>();
   const [semaphorePublicKey, setSemaphorePublicKey] = useState<
@@ -213,8 +210,6 @@ export default function AccountCreationForm() {
     setIsLoggingIn(false);
   };
 
-
-
   const checkPoapBalance = async (account: `0x${string}`) => {
     setIsCheckingBalance(true);
     const balance = await publicClient.getL1TokenBalance({
@@ -227,8 +222,9 @@ export default function AccountCreationForm() {
     setIsBalanceChecked(true);
   };
 
-  const handleVoting = async () => {
+  const vote = async () => {
     if (semaphoreGroupIdentity) {
+        setIsVoting(true);
         const semaphoreSubgraph = new SemaphoreSubgraph(
           "https://api.studio.thegraph.com/query/65978/sesmaphore-paymaster/0.0.1"
         );
@@ -260,7 +256,7 @@ export default function AccountCreationForm() {
           }),
         });
 
-        setIsSendingUserOp(true);
+
 
         const userOpHash = await kernelClient.sendUserOperation({
           userOperation: {
@@ -272,12 +268,12 @@ export default function AccountCreationForm() {
         console.log("userOpHash", userOpHash);
 
 
-        setIsSendingUserOp(false);
+        setIsVoting(false);
     } 
   };
 
-  const fakeHandlingVoting = async () => {
-    setIsSendingUserOp(true);
+  const fakeVote = async () => {
+    setIsVoting(true);
     setUserOpStatus("Sending UserOp...");
     console.log("Sending userop with username:", username);
 
@@ -310,11 +306,11 @@ export default function AccountCreationForm() {
         : `UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Notice how this UserOp costs a lot less gas and requires no prompting.`;
 
     setUserOpStatus(userOpMessage);
-    setIsSendingUserOp(false);
+    setIsVoting(false);
   };
 
-  const handleSendUserOp = async () => {
-    setIsSendingUserOp(true);
+  const joinSemaphoreGroup = async () => {
+    setIsJoiningSemaphoreGroup(true);
     setUserOpStatus("Joining...");
 
     const identity = new Identity();
@@ -356,9 +352,10 @@ export default function AccountCreationForm() {
         : `UserOp completed. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view.</a> <br> Notice how this UserOp costs a lot less gas and requires no prompting.`;
 
     setUserOpStatus(userOpMessage);
-    setIsSendingUserOp(false);
     setIsSemaphoreGroupAssigned(true);
     setSemaphoreGroupIdentity(identity);
+    setIsJoiningSemaphoreGroup(false);
+
   };
 
   return (
@@ -366,13 +363,6 @@ export default function AccountCreationForm() {
       <div className="flex flex-col">
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            {/* <input
-                    type="text"
-                    placeholder="Your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="p-2 border border-gray-300 rounded-lg w-full mb-4" // Added w-full and mb-4 for full width and margin-bottom
-                  /> */}
             <button
               onClick={handleRegister}
               disabled={isRegistering || isLoggingIn}
@@ -424,7 +414,7 @@ export default function AccountCreationForm() {
               }
               disabled={isLoggingIn || isRegistering || isCheckingBalance}
               className={`w-full mb-10 px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
-                isKernelClientReady && !isSendingUserOp
+                isKernelClientReady && !isJoiningSemahoreGroup
                   ? "bg-red-500 hover:bg-red-700 focus:ring-red-500"
                   : "bg-gray-500"
               }`}
@@ -449,15 +439,15 @@ export default function AccountCreationForm() {
           {accountAddress && parseInt(poapBalance) > 0 && (
             <>
               <button
-                onClick={handleSendUserOp}
-                disabled={!isKernelClientReady || isSendingUserOp}
+                onClick={joinSemaphoreGroup}
+                disabled={!isKernelClientReady || isJoiningSemahoreGroup}
                 className={`w-full px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
-                  isKernelClientReady && !isSendingUserOp
+                  isKernelClientReady && !isJoiningSemahoreGroup
                     ? "bg-green-500 hover:bg-green-700 focus:ring-green-500"
                     : "bg-gray-500"
                 }`}
               >
-                {isSendingUserOp ? (
+                {isJoiningSemahoreGroup ? (
                   <div className="spinner"></div>
                 ) : (
                   "Join the group"
@@ -480,16 +470,15 @@ export default function AccountCreationForm() {
             isSemaphoreGroupAssigned &&
             semaphoreGroupIdentity && (
               <button
-                // onClick={handleVoting}
-                onClick={handleVoting}
-                disabled={!isKernelClientReady || isSendingUserOp}
+                onClick={vote}
+                disabled={!isKernelClientReady || isVoting}
                 className={`w-full px-4 py-2 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 flex justify-center items-center ${
-                  isKernelClientReady && !isSendingUserOp
+                  isKernelClientReady && !isVoting
                     ? "bg-pink-500 hover:bg-pink-700 focus:ring-pink-500"
                     : "bg-gray-500"
                 }`}
               >
-                {isSendingUserOp ? <div className="spinner"></div> : "Vote"}
+                {isVoting ? <div className="spinner"></div> : "Vote"}
               </button>
             )}
         </div>
