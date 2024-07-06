@@ -47,6 +47,7 @@ import { useQuery } from "@apollo/client";
 import Login from "./Login";
 import AddressAvatar from "./AddressAvatar";
 import Button from "./Button";
+import VotingOptions from "./VotingOptions";
 
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
@@ -66,6 +67,7 @@ export default function AccountCreationForm() {
   const [isJoiningSemahoreGroup, setIsJoiningSemaphoreGroup] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
   const [userHasVoted, setUserHasVoted] = useState(false);
+  const [isFirstOptionSelected, setIsFirstOptionSelected] = useState(true);
   
   const [userOpHash, setUserOpHash] = useState("");
   const [userOpStatus, setUserOpStatus] = useState("");
@@ -75,6 +77,7 @@ export default function AccountCreationForm() {
   const [poapBalance, setPoapBalance] = useState("0");
   const [isSemaphoreGroupAssigned, setIsSemaphoreGroupAssigned] = useState(false);
   const [semaphoreGroupIdentity, setSemaphoreGroupIdentity] = useState<Identity>();
+
 
   const [semaphorePrivateKey, setSemaphorePrivateKey] = useState<string | Uint8Array | Buffer | undefined>();
   const [semaphorePublicKey, setSemaphorePublicKey] = useState<
@@ -314,6 +317,7 @@ export default function AccountCreationForm() {
         );
 
         semaphoreProof = proof;
+        const votingValue = isFirstOptionSelected ? 1 : 2;
 
         const callData = await kernelClient.account.encodeCallData({
           to: process.env.NEXT_PUBLIC_STORAGE_CONTRACT,
@@ -321,7 +325,7 @@ export default function AccountCreationForm() {
           data: encodeFunctionData({
             abi: STORAGE_ABI,
             functionName: "store",
-            args: [6],
+            args: [votingValue],
           }),
         });
 
@@ -350,7 +354,6 @@ export default function AccountCreationForm() {
        );
 
       toast(successMessage);
-
       setIsVoting(false);
       setUserHasVoted(true);
     } 
@@ -407,8 +410,10 @@ export default function AccountCreationForm() {
 
           {accountAddress &&
             isSemaphoreGroupAssigned &&
-            semaphoreGroupIdentity && !userHasVoted && (
+            semaphoreGroupIdentity &&
+            !userHasVoted && (
               <div className="mb-2 text-center font-medium">
+                <VotingOptions setIsFirstOptionSelected={setIsFirstOptionSelected} isFirstOptionSelected={isFirstOptionSelected} />
                 <Button
                   label="Vote"
                   isLoading={isVoting}
@@ -419,7 +424,11 @@ export default function AccountCreationForm() {
               </div>
             )}
 
-            {userHasVoted && <div className="text-center text-xl pt-4">Thanks for your vote.</div>}
+          {userHasVoted && (
+            <div className="text-center text-xl pt-4">
+              Thanks for your vote.
+            </div>
+          )}
         </div>
       </div>
     </div>
