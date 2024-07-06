@@ -26,7 +26,7 @@ export default function AddressAvatar(
         rel="noopener noreferrer"
         className="text-white hover:underline"
       >
-        {truncateEthAddress(accountAddress)}
+        {accountAddress}
       </a>
     </div>
   );

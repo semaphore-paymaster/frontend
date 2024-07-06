@@ -28,6 +28,10 @@ import { generateProof } from "@semaphore-protocol/proof";
 import { Group } from "@semaphore-protocol/group";
 
 
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
+
 import {
   BUNDLER_URL,
   CHAIN,
@@ -59,9 +63,9 @@ export default function AccountCreationForm() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  
   const [isJoiningSemahoreGroup, setIsJoiningSemaphoreGroup] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
+  const [userHasVoted, setUserHasVoted] = useState(false);
   
   const [userOpHash, setUserOpHash] = useState("");
   const [userOpStatus, setUserOpStatus] = useState("");
@@ -224,7 +228,68 @@ export default function AccountCreationForm() {
     setPoapBalance(balance.toString());
     setIsCheckingBalance(false);
     setIsBalanceChecked(true);
+    toast('You are elegible! 🎉');
   };
+
+  const joinSemaphoreGroup = async () => {
+      setIsJoiningSemaphoreGroup(true);
+      const identity = new Identity();
+      const { privateKey, publicKey, commitment } = identity;
+
+      const callData = await kernelClient.account.encodeCallData({
+        to: process.env.NEXT_PUBLIC_GATEKEEPER_CONTRACT,
+        value: BigInt(0),
+        data: encodeFunctionData({
+          abi: GATEKEEPER_ABI,
+          functionName: "enter",
+          args: [0, commitment],
+        }),
+      });
+
+      const userOpHash = await kernelClient.sendUserOperation({
+        userOperation: {
+          callData,
+        },
+      });
+
+      setSemaphorePrivateKey(privateKey);
+      setSemaphorePublicKey(publicKey.toString());
+
+      setUserOpHash(userOpHash);
+
+      const bundlerClient = kernelClient.extend(
+        bundlerActions(ENTRYPOINT_ADDRESS_V07)
+      );
+      await bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
+
+      setUserOpCount(userOpCount + 1);
+
+      const opHashLink = `https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia`;
+      const successMessage = (
+        <div className="flex flex-col">
+          <div>You are now part of the group 😎</div>
+          <div>
+            <a
+              href={opHashLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-200 hover:text-blue-700"
+            >
+              Click here to view more details.
+            </a>
+          </div>
+        </div>
+      );
+
+      toast(successMessage);
+
+      setIsSemaphoreGroupAssigned(true);
+      setSemaphoreGroupIdentity(identity);
+      setIsJoiningSemaphoreGroup(false);
+    };
+
 
   const vote = async () => {
     if (semaphoreGroupIdentity) {
@@ -260,8 +325,6 @@ export default function AccountCreationForm() {
           }),
         });
 
-
-
         const userOpHash = await kernelClient.sendUserOperation({
           userOperation: {
             callData,
@@ -269,97 +332,28 @@ export default function AccountCreationForm() {
           },
         });
 
-        console.log("userOpHash", userOpHash);
+       const opHashLink = `https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia`;
+       const successMessage = (
+         <div className="flex flex-col">
+           <div>Vote submitted successfully 🗳️</div>
+           <div>
+             <a
+               href={opHashLink}
+               target="_blank"
+               rel="noopener noreferrer"
+               className="text-blue-200 hover:text-blue-700"
+             >
+               Click here to view more details.
+             </a>
+           </div>
+         </div>
+       );
 
+      toast(successMessage);
 
-        setIsVoting(false);
+      setIsVoting(false);
+      setUserHasVoted(true);
     } 
-  };
-
-  const fakeVote = async () => {
-    setIsVoting(true);
-    setUserOpStatus("Sending UserOp...");
-    console.log("Sending userop with username:", username);
-
-    const userOpHash = await kernelClient.sendUserOperation({
-      userOperation: {
-        callData: await sessionKeyAccount.encodeCallData({
-          to: "0x0000000000000000000000000000000000000000",
-          value: BigInt(0),
-          data: "0x",
-        }),
-      },
-    });
-
-    setUserOpHash(userOpHash);
-    console.log("waiting for userOp:", userOpHash);
-
-    const bundlerClient = kernelClient.extend(
-      bundlerActions(ENTRYPOINT_ADDRESS_V07)
-    );
-    await bundlerClient.waitForUserOperationReceipt({
-      hash: userOpHash,
-    });
-
-    setUserOpCount(userOpCount + 1);
-
-    const userOpMessage = `Vote submitted. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-200 hover:text-blue-700">Click here to view more details.</a>`;
-
-    if (userOpHash) {
-      setUserOpStatus(userOpMessage);
-    }
-   
-    setIsVoting(false);
-  };
-
-  const joinSemaphoreGroup = async () => {
-    setIsJoiningSemaphoreGroup(true);
-    setUserOpStatus("Joining...");
-
-    const identity = new Identity();
-    const { privateKey, publicKey, commitment } = identity;
-
-    const callData = await kernelClient.account.encodeCallData({
-      to: process.env.NEXT_PUBLIC_GATEKEEPER_CONTRACT,
-      value: BigInt(0),
-      data: encodeFunctionData({
-        abi: GATEKEEPER_ABI,
-        functionName: "enter",
-        args: [0, commitment],
-      }),
-    });
-
-    const userOpHash = await kernelClient.sendUserOperation({
-      userOperation: {
-        callData,
-      },
-    });
-
-    setSemaphorePrivateKey(privateKey);
-    setSemaphorePublicKey(publicKey.toString());
-
-    setUserOpHash(userOpHash);
-
-    const bundlerClient = kernelClient.extend(
-      bundlerActions(ENTRYPOINT_ADDRESS_V07)
-    );
-    await bundlerClient.waitForUserOperationReceipt({
-      hash: userOpHash,
-    });
-
-    setUserOpCount(userOpCount + 1);
-
-    const userOpMessage = `You are now part of the group. <a href="https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700">Click here to view more details.</a>`
-      
-
-    if (userOpHash) {
-       setUserOpStatus(userOpMessage);
-    }
-   
-    setIsSemaphoreGroupAssigned(true);
-    setSemaphoreGroupIdentity(identity);
-    setIsJoiningSemaphoreGroup(false);
-
   };
 
   return (
@@ -376,15 +370,6 @@ export default function AccountCreationForm() {
 
         <div className="pt-4">
           {accountAddress && <AddressAvatar accountAddress={accountAddress} />}
-          {accountAddress && parseInt(poapBalance) > 0 && (
-            <div className="mb-2 text-center font-medium">
-              <span>
-                {parseInt(poapBalance) > 0
-                  ? "You are eligible! 🎉"
-                  : "Unfortunately you are not eligible"}
-              </span>
-            </div>
-          )}
           {accountAddress && !isBalanceChecked && (
             <Button
               label="Check Eligibility"
@@ -406,17 +391,6 @@ export default function AccountCreationForm() {
               </div>
             )}
 
-          {userOpHash && (
-            <>
-              <div
-                className="mt-2 text-center"
-                dangerouslySetInnerHTML={{
-                  __html: userOpStatus,
-                }}
-              />
-            </>
-          )}
-
           {accountAddress &&
             parseInt(poapBalance) > 0 &&
             !semaphoreGroupIdentity && (
@@ -433,7 +407,7 @@ export default function AccountCreationForm() {
 
           {accountAddress &&
             isSemaphoreGroupAssigned &&
-            semaphoreGroupIdentity && (
+            semaphoreGroupIdentity && !userHasVoted && (
               <div className="mb-2 text-center font-medium">
                 <Button
                   label="Vote"
@@ -444,6 +418,8 @@ export default function AccountCreationForm() {
                 />
               </div>
             )}
+
+            {userHasVoted && <div className="text-center text-xl pt-4">Thanks for your vote.</div>}
         </div>
       </div>
     </div>
