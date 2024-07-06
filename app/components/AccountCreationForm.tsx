@@ -469,7 +469,7 @@ export default function AccountCreationForm() {
 
         console.log("UserOp hash:", registerUserOpHash);
         console.log("Waiting for UserOp to complete...");
-        setVotingPercentage(33);
+        setVotingPercentage(50);
 
 
         const registerBundlerClient = kernelClient.extend(
@@ -483,15 +483,15 @@ export default function AccountCreationForm() {
           }
         );
 
-        setVotingPercentage(43);
+        setVotingPercentage(55);
 
-        const stateIndexData = await publicClient.readContract({
+        const numSignUps = await publicClient.readContract({
           address: "0xf77429Bd73EEEe4fA5aCb501D6FD0232b35b47Ce",
           abi: MACI_FACTORY_ABI,
           functionName: "numSignUps",
         });
 
-        console.log("state index: ", stateIndexData);
+        console.log("numSignUps: ", numSignUps);
 
         console.log(
           `r1: ${registerReceipt.success}, ${registerReceipt.sender}, ${registerReceipt.actualGasUsed}`
@@ -508,7 +508,6 @@ export default function AccountCreationForm() {
         // VOTING
         // ****************************************************
 
-         const stateIndex = stateIndexData as number;
          const voteOptionIndex = isFirstOptionSelected ? 1 : 2;
          const newVoteWeight = 1;
          const nonce = 1;
@@ -520,9 +519,8 @@ export default function AccountCreationForm() {
          );
 
          const encKeypair = new Keypair();
-          // const userMaciPubKey = PubKey.deserialize(
-          //   "macipk.90e6d63549dea089ab3c7b06ae3ef70d6e27c97bc2c93b7f3e7aafa6329a45fd"
-          // );
+
+         const stateIndex = parseInt(numSignUps as string) - 1;
 
          // create the command object
          const command: PCommand = new PCommand(
@@ -534,10 +532,6 @@ export default function AccountCreationForm() {
            BigInt(pollId),
            userSalt
          );
-
-        //  const userMaciPrivKey = PrivKey.deserialize(
-        //    "macisk.3941b6742caba5e437b69c5a1b89c4ccfaab21588ef639d8c41240a33b216538"
-        //  );
 
          // sign the command with the user private key
          const signature = command.sign(registerPrivKey);
@@ -551,7 +545,7 @@ export default function AccountCreationForm() {
 
 
         const voteCallData = await kernelClient.account.encodeCallData({
-          to: "0xD841DC0D7A487a4C45883A3c2F22B76d920f6331",
+          to: "0x506cFF5Ecd3aEd1EDe94a31B3EFBB97b28a28B90",
           value: BigInt(0),
           data: encodeFunctionData({
             abi: MACI_POLL_ABI,
