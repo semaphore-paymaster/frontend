@@ -20,17 +20,21 @@ import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
 import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless";
 
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { http, encodeFunctionData } from "viem";
+import {
+  http,
+  encodeFunctionData,
+  encodeAbiParameters,
+  parseAbiParameters,
+} from "viem";
 
 import { Identity } from "@semaphore-protocol/identity";
 import { SemaphoreSubgraph } from "@semaphore-protocol/data";
 import { generateProof } from "@semaphore-protocol/proof";
 import { Group } from "@semaphore-protocol/group";
+import { PubKey } from "maci-domainobjs";
 
-
-import { ToastContainer, toast } from "react-toastify";
+import {  toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
 
 import {
   BUNDLER_URL,
@@ -48,6 +52,7 @@ import Login from "./Login";
 import AddressAvatar from "./AddressAvatar";
 import Button from "./Button";
 import VotingOptions from "./VotingOptions";
+import { MACI_FACTORY_ABI } from "../config/macyContracts";
 
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
@@ -83,6 +88,44 @@ export default function AccountCreationForm() {
   const [semaphorePublicKey, setSemaphorePublicKey] = useState<
     string | Uint8Array | Buffer | undefined
   >();
+
+  const buildSuccessMessage = (message: string, opHashLink = "") => {
+    return (
+         <div className="flex flex-col">
+          <div>{message}</div>
+          <div>
+            <a
+              href={opHashLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-200 hover:text-blue-700"
+            >
+              Click here to view more details.
+            </a>
+          </div>
+        </div>
+    )
+  }
+ 
+  const encodeSemaphoreProof = (semaphoreProof: any) => {
+    const {
+      merkleTreeDepth,
+      merkleTreeRoot,
+      nullifier,
+      message,
+      scope,
+      points,
+    } = semaphoreProof;
+
+    const encodedData = encodeAbiParameters(
+      parseAbiParameters(
+        "uint48, uint48, uint256, uint256, uint256, uint256, uint256, uint256[8]"
+      ),
+      [0, 0, merkleTreeDepth, merkleTreeRoot, nullifier, message, scope, points]
+    );
+
+    return encodedData;
+  };
 
 
   const createAccountAndClient = async (passkeyValidator: any) => {
@@ -125,31 +168,8 @@ export default function AccountCreationForm() {
           // ** Enable this if you want to use the custom Paymaster **
           ////////////////////////////////////////////////////////////////
           // if (!userOperation.factory && semaphoreProof) {
-          //   const {
-          //     merkleTreeDepth,
-          //     merkleTreeRoot,
-          //     nullifier,
-          //     message,
-          //     scope,
-          //     points,
-          //   } = semaphoreProof;
 
-          //   const paymasterData = encodeAbiParameters(
-          //     parseAbiParameters(
-          //       "uint48, uint48, uint256, uint256, uint256, uint256, uint256, uint256[8]"
-          //     ),
-
-          //     [
-          //       0,
-          //       0,
-          //       merkleTreeDepth,
-          //       merkleTreeRoot,
-          //       nullifier,
-          //       message,
-          //       scope,
-          //       points,
-          //     ]
-          //   );
+          //   const paymasterData = encodeSemaphoreProof(semaphoreProof)
 
           //   // console.log("semaphoreProof", semaphoreProof);
           //   // console.log("paymasterData", paymasterData);
@@ -270,29 +290,14 @@ export default function AccountCreationForm() {
       setUserOpCount(userOpCount + 1);
 
       const opHashLink = `https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia`;
-      const successMessage = (
-        <div className="flex flex-col">
-          <div>You are now part of the group 😎</div>
-          <div>
-            <a
-              href={opHashLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-200 hover:text-blue-700"
-            >
-              Click here to view more details.
-            </a>
-          </div>
-        </div>
-      );
 
+      const successMessage = buildSuccessMessage("You are now part of the group 😎", opHashLink) ;
       toast(successMessage);
 
       setIsSemaphoreGroupAssigned(true);
       setSemaphoreGroupIdentity(identity);
       setIsJoiningSemaphoreGroup(false);
-    };
-
+  };
 
   const vote = async () => {
     if (semaphoreGroupIdentity) {
@@ -336,28 +341,120 @@ export default function AccountCreationForm() {
           },
         });
 
-       const opHashLink = `https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia`;
-       const successMessage = (
-         <div className="flex flex-col">
-           <div>Vote submitted successfully 🗳️</div>
-           <div>
-             <a
-               href={opHashLink}
-               target="_blank"
-               rel="noopener noreferrer"
-               className="text-blue-200 hover:text-blue-700"
-             >
-               Click here to view more details.
-             </a>
-           </div>
-         </div>
-       );
+      const opHashLink = `https://jiffyscan.xyz/userOpHash/${userOpHash}?network=sepolia`;
+      const successMessage = buildSuccessMessage("Vote submitted successfully 🗳️", opHashLink);
 
       toast(successMessage);
       setIsVoting(false);
       setUserHasVoted(true);
     } 
   };
+
+  const maciVote = async () => {
+    // const user = new Keypair();
+
+        if (semaphoreGroupIdentity) {
+        setIsVoting(true);
+        const semaphoreSubgraph = new SemaphoreSubgraph(
+          "https://api.studio.thegraph.com/query/65978/sesmaphore-paymaster/0.0.1"
+        );
+        const groupResponse = await semaphoreSubgraph.getGroup(
+          process.env.NEXT_PUBLIC_SEMAPHORE_GROUP_ID as string,
+          {
+            members: true,
+          }
+        );
+
+        const group = new Group(groupResponse.members);
+
+        const proof = await generateProof(
+          semaphoreGroupIdentity,
+          group,
+          0,
+          0
+        );
+
+        semaphoreProof = proof;
+        const votingValue = isFirstOptionSelected ? 1 : 2;
+
+        const nn = PubKey.deserialize(
+          "macipk.2ffe72cc95f370f710076795c9b30de7f63c51d2fc7f3aed46dc6e08267fc221"
+        );
+
+        const signupGatekeeperData = encodeSemaphoreProof(semaphoreProof);
+        // the default initial voice credit proxy data
+        const DEFAULT_IVCP_DATA =
+          "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+        // // Send a UserOp
+        // const userOpHash = await kernelClient.sendUserOperation({
+        //   userOperation: {
+        //     callGasLimit: BigInt("0xD6D8"),
+        //     preVerificationGas: BigInt("0x186A0"),
+        //     verificationGasLimit: BigInt("0xF4240"),
+        //     callData: await kernelClient.account.encodeCallData({
+        //       to: "0x1C240Cd9A75838dEE6d409BC7C8D3af81683F224",
+        //       value: BigInt(0),
+        //       data: encodeFunctionData({
+        //         abi: MACI_FACTORY_ABI,
+        //         functionName: "signUp",
+        //         args: [
+        //           (nn as any).asContractParam(),
+        //           `${signupGatekeeperData}`,
+        //           DEFAULT_IVCP_DATA,
+        //         ],
+        //       }),
+        //     }),
+        //   },
+        // });
+
+        const callData = await kernelClient.account.encodeCallData({
+          to: "0x1C240Cd9A75838dEE6d409BC7C8D3af81683F224",
+          value: BigInt(0),
+          data: encodeFunctionData({
+            abi: MACI_FACTORY_ABI,
+            functionName: "signUp",
+            args: [
+              (nn as any).asContractParam(),
+              `${signupGatekeeperData}`,
+              DEFAULT_IVCP_DATA,
+            ],
+          }),
+        });
+
+        const userOpHash = await kernelClient.sendUserOperation({
+          userOperation: {
+            callData,
+          },
+        });
+
+        console.log("UserOp hash:", userOpHash);
+        console.log("Waiting for UserOp to complete...");
+
+        const bundlerClient = kernelClient.extend(
+          bundlerActions(ENTRYPOINT_ADDRESS_V07)
+        );
+        const receipt = await bundlerClient.waitForUserOperationReceipt({
+          hash: userOpHash,
+          timeout: 60000,
+        });
+
+        console.log(
+          `r1: ${receipt.success}, ${receipt.sender}, ${receipt.actualGasUsed}`
+        );
+        console.log("r2: " + JSON.stringify(receipt.receipt.transactionHash));
+
+        console.log(
+          "View completed UserOp here: https://jiffyscan.xyz/userOpHash/" +
+            userOpHash
+        );
+
+        const sucessMessage = buildSuccessMessage("Vote submitted successfully 🗳️", `https://jiffyscan.xyz/userOpHash/${userOpHash}`)
+        toast(sucessMessage);
+        setIsVoting(false);
+        setUserHasVoted(true);
+    }
+  }
 
   return (
     <div className="grid grid-cols-1 gap-12">
@@ -418,7 +515,8 @@ export default function AccountCreationForm() {
                   label="Vote"
                   isLoading={isVoting}
                   disabled={!isKernelClientReady || isVoting}
-                  handleRegister={vote}
+                  // handleRegister={vote}
+                  handleRegister={maciVote}
                   color="pink"
                 />
               </div>
