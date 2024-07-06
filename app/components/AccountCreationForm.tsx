@@ -448,7 +448,7 @@ export default function AccountCreationForm() {
           "0x0000000000000000000000000000000000000000000000000000000000000000";
 
         const callData = await kernelClient.account.encodeCallData({
-          to: "0x6D45D88FbA1632Fe029F0264bE9640EE61c7487f",
+          to: process.env.NEXT_PUBLIC_MACI_FACTORY_CONTRACT,
           value: BigInt(0),
           data: encodeFunctionData({
             abi: MACI_FACTORY_ABI,
@@ -486,7 +486,7 @@ export default function AccountCreationForm() {
         setVotingPercentage(55);
 
         const numSignUps = await publicClient.readContract({
-          address: "0x6D45D88FbA1632Fe029F0264bE9640EE61c7487f",
+          address: process.env.NEXT_PUBLIC_MACI_FACTORY_CONTRACT as `0x${string}`,
           abi: MACI_FACTORY_ABI,
           functionName: "numSignUps",
         });
@@ -545,7 +545,7 @@ export default function AccountCreationForm() {
 
 
         const voteCallData = await kernelClient.account.encodeCallData({
-          to: "0x992Ed415cdccF87e9B20F853B0c0BC55Da6B54f2",
+          to: process.env.NEXT_PUBLIC_MACI_POLL,
           value: BigInt(0),
           data: encodeFunctionData({
             abi: MACI_POLL_ABI,
