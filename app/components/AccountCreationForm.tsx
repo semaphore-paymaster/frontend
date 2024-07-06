@@ -25,13 +25,17 @@ import {
   encodeFunctionData,
   encodeAbiParameters,
   parseAbiParameters,
+  parseEventLogs,
 } from "viem";
 
 import { Identity } from "@semaphore-protocol/identity";
 import { SemaphoreSubgraph } from "@semaphore-protocol/data";
 import { generateProof } from "@semaphore-protocol/proof";
 import { Group } from "@semaphore-protocol/group";
-import { PubKey } from "maci-domainobjs";
+import { verifyProof } from "@semaphore-protocol/proof";
+
+import { genRandomSalt } from "maci-crypto";
+import { Keypair, PubKey, PCommand } from "maci-domainobjs";
 
 import {  toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -43,6 +47,7 @@ import {
   PAYMASTER_URL,
 } from "../config/zerodev";
 
+import { AbiCoder } from "ethers";
 import { publicClient } from "../config/viem";
 import { GATEKEEPER_ABI } from "../config/gatekeeper";
 import { STORAGE_ABI } from "../config/storage";
@@ -52,7 +57,7 @@ import Login from "./Login";
 import AddressAvatar from "./AddressAvatar";
 import Button from "./Button";
 import VotingOptions from "./VotingOptions";
-import { MACI_FACTORY_ABI } from "../config/macyContracts";
+import { MACI_FACTORY_ABI, MACI_POLL_ABI } from "../config/macyContracts";
 
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
@@ -73,6 +78,7 @@ export default function AccountCreationForm() {
   const [isVoting, setIsVoting] = useState(false);
   const [userHasVoted, setUserHasVoted] = useState(false);
   const [isFirstOptionSelected, setIsFirstOptionSelected] = useState(true);
+  const [votingPercentage, setVotingPercentage] = useState(5);
   
   const [userOpHash, setUserOpHash] = useState("");
   const [userOpStatus, setUserOpStatus] = useState("");
@@ -117,11 +123,23 @@ export default function AccountCreationForm() {
       points,
     } = semaphoreProof;
 
-    const encodedData = encodeAbiParameters(
-      parseAbiParameters(
-        "uint48, uint48, uint256, uint256, uint256, uint256, uint256, uint256[8]"
-      ),
-      [0, 0, merkleTreeDepth, merkleTreeRoot, nullifier, message, scope, points]
+    // const encodedData = encodeAbiParameters(
+    //   parseAbiParameters(
+    //     "uint256, uint256, uint256, uint256, uint256, uint256[8]"
+    //   ),
+    //   [merkleTreeDepth, merkleTreeRoot, nullifier, message, scope, points]
+    // );
+
+    const encodedData = AbiCoder.defaultAbiCoder().encode(
+      ["uint256", "uint256", "uint256", "uint256", "uint256", "uint256[8]"],
+      [
+        merkleTreeDepth,
+        merkleTreeRoot,
+        nullifier,
+        message,
+        scope,
+        points,
+      ]
     );
 
     return encodedData;
@@ -351,9 +369,8 @@ export default function AccountCreationForm() {
   };
 
   const maciVote = async () => {
-    // const user = new Keypair();
 
-        if (semaphoreGroupIdentity) {
+      if (semaphoreGroupIdentity) {
         setIsVoting(true);
         const semaphoreSubgraph = new SemaphoreSubgraph(
           "https://api.studio.thegraph.com/query/65978/sesmaphore-paymaster/0.0.1"
@@ -367,88 +384,184 @@ export default function AccountCreationForm() {
 
         const group = new Group(groupResponse.members);
 
+        console.log("group", group);
+
         const proof = await generateProof(
           semaphoreGroupIdentity,
           group,
-          0,
-          0
+          BigInt(0),
+          BigInt(1)
         );
 
         semaphoreProof = proof;
-        const votingValue = isFirstOptionSelected ? 1 : 2;
 
-        const nn = PubKey.deserialize(
-          "macipk.2ffe72cc95f370f710076795c9b30de7f63c51d2fc7f3aed46dc6e08267fc221"
-        );
+        const registerEncKeypair = new Keypair();
+
+        // const nn = PubKey.deserialize(
+        //   "macipk.2ffe72cc95f370f710076795c9b30de7f63c51d2fc7f3aed46dc6e08267fc221"
+        // );
+
+        const registerPubKey = registerEncKeypair.pubKey;
+        const registerPrivKey = registerEncKeypair.privKey;
+
+        console.log("semaphoreProof", semaphoreProof);
+
+        const isValidProof = await verifyProof(semaphoreProof);
+
+        console.log("isValidProof", isValidProof);
 
         const signupGatekeeperData = encodeSemaphoreProof(semaphoreProof);
-        // the default initial voice credit proxy data
         const DEFAULT_IVCP_DATA =
           "0x0000000000000000000000000000000000000000000000000000000000000000";
 
-        // // Send a UserOp
-        // const userOpHash = await kernelClient.sendUserOperation({
-        //   userOperation: {
-        //     callGasLimit: BigInt("0xD6D8"),
-        //     preVerificationGas: BigInt("0x186A0"),
-        //     verificationGasLimit: BigInt("0xF4240"),
-        //     callData: await kernelClient.account.encodeCallData({
-        //       to: "0x1C240Cd9A75838dEE6d409BC7C8D3af81683F224",
-        //       value: BigInt(0),
-        //       data: encodeFunctionData({
-        //         abi: MACI_FACTORY_ABI,
-        //         functionName: "signUp",
-        //         args: [
-        //           (nn as any).asContractParam(),
-        //           `${signupGatekeeperData}`,
-        //           DEFAULT_IVCP_DATA,
-        //         ],
-        //       }),
-        //     }),
-        //   },
-        // });
-
         const callData = await kernelClient.account.encodeCallData({
-          to: "0x1C240Cd9A75838dEE6d409BC7C8D3af81683F224",
+          to: "0x7f660c14e28C4ecbfa2392E32783887f8756f7C8",
           value: BigInt(0),
           data: encodeFunctionData({
             abi: MACI_FACTORY_ABI,
             functionName: "signUp",
             args: [
-              (nn as any).asContractParam(),
+              (registerPubKey as any).asContractParam(),
               `${signupGatekeeperData}`,
               DEFAULT_IVCP_DATA,
             ],
           }),
         });
 
-        const userOpHash = await kernelClient.sendUserOperation({
+        const registerUserOpHash = await kernelClient.sendUserOperation({
           userOperation: {
             callData,
           },
         });
 
-        console.log("UserOp hash:", userOpHash);
+        console.log("UserOp hash:", registerUserOpHash);
         console.log("Waiting for UserOp to complete...");
+        setVotingPercentage(33);
 
-        const bundlerClient = kernelClient.extend(
+
+        const registerBundlerClient = kernelClient.extend(
           bundlerActions(ENTRYPOINT_ADDRESS_V07)
         );
-        const receipt = await bundlerClient.waitForUserOperationReceipt({
-          hash: userOpHash,
-          timeout: 60000,
+
+        const registerReceipt = await registerBundlerClient.waitForUserOperationReceipt(
+          {
+            hash: registerUserOpHash,
+            timeout: 60000,
+          }
+        );
+
+        setVotingPercentage(43);
+
+        const stateIndexData = await publicClient.readContract({
+          address: "0x7f660c14e28C4ecbfa2392E32783887f8756f7C8",
+          abi: MACI_FACTORY_ABI,
+          functionName: "numSignUps",
         });
 
+        console.log("state index: ", stateIndexData);
+
         console.log(
-          `r1: ${receipt.success}, ${receipt.sender}, ${receipt.actualGasUsed}`
+          `r1: ${registerReceipt.success}, ${registerReceipt.sender}, ${registerReceipt.actualGasUsed}`
         );
-        console.log("r2: " + JSON.stringify(receipt.receipt.transactionHash));
+        console.log("r2: ", registerReceipt);
 
         console.log(
           "View completed UserOp here: https://jiffyscan.xyz/userOpHash/" +
-            userOpHash
+            registerUserOpHash
         );
 
+        setVotingPercentage(66);
+        // ****************************************************
+        // VOTING
+        // ****************************************************
+
+         const stateIndex = stateIndexData as number;
+         const voteOptionIndex = isFirstOptionSelected ? 1 : 2;
+         const newVoteWeight = 1;
+         const nonce = 1;
+         const pollId = 0;
+         const userSalt = genRandomSalt();
+
+         const coordinatorPubKey = PubKey.deserialize(
+           "macipk.925ba4210043059acb5aebcda6b389b070cffd58e2077e69119db00051550c31"
+         );
+
+         const encKeypair = new Keypair();
+          // const userMaciPubKey = PubKey.deserialize(
+          //   "macipk.90e6d63549dea089ab3c7b06ae3ef70d6e27c97bc2c93b7f3e7aafa6329a45fd"
+          // );
+
+         // create the command object
+         const command: PCommand = new PCommand(
+           BigInt(stateIndex),
+           registerPubKey,
+           BigInt(voteOptionIndex),
+           BigInt(newVoteWeight),
+           BigInt(nonce),
+           BigInt(pollId),
+           userSalt
+         );
+
+        //  const userMaciPrivKey = PrivKey.deserialize(
+        //    "macisk.3941b6742caba5e437b69c5a1b89c4ccfaab21588ef639d8c41240a33b216538"
+        //  );
+
+         // sign the command with the user private key
+         const signature = command.sign(registerPrivKey);
+         // encrypt the command using a shared key between the user and the coordinator
+         const message = command.encrypt(
+           signature,
+           Keypair.genEcdhSharedKey(encKeypair.privKey, coordinatorPubKey)
+         );
+
+          setVotingPercentage(76);
+
+
+        const voteCallData = await kernelClient.account.encodeCallData({
+          to: "0xA4af2fC4133FC5Fb2D92e7DF32eE378b9EA4A66F",
+          value: BigInt(0),
+          data: encodeFunctionData({
+            abi: MACI_POLL_ABI,
+            functionName: "publishMessage",
+            args: [
+              message.asContractParam(),
+              encKeypair.pubKey.asContractParam(),
+            ],
+          }),
+        });
+
+        const voteUserOpHash = await kernelClient.sendUserOperation({
+          userOperation: {
+            callData: voteCallData,
+          },
+        });
+
+         setVotingPercentage(95);
+
+
+        const voteBundlerClient = kernelClient.extend(
+          bundlerActions(ENTRYPOINT_ADDRESS_V07)
+        );
+
+        const voteReceipt =
+          await voteBundlerClient.waitForUserOperationReceipt({
+            hash: voteUserOpHash,
+            timeout: 60000,
+          });
+
+
+         console.log(
+           `r1: ${voteReceipt.success}, ${voteReceipt.sender}, ${voteReceipt.actualGasUsed}`
+         );
+         console.log("r2: " + JSON.stringify(voteReceipt.receipt.transactionHash));
+
+         console.log(
+           "View completed UserOp here: https://jiffyscan.xyz/userOpHash/" +
+             userOpHash
+         ); 
+
+
+        setVotingPercentage(100);
         const sucessMessage = buildSuccessMessage("Vote submitted successfully 🗳️", `https://jiffyscan.xyz/userOpHash/${userOpHash}`)
         toast(sucessMessage);
         setIsVoting(false);
@@ -510,7 +623,10 @@ export default function AccountCreationForm() {
             semaphoreGroupIdentity &&
             !userHasVoted && (
               <div className="mb-2 text-center font-medium">
-                <VotingOptions setIsFirstOptionSelected={setIsFirstOptionSelected} isFirstOptionSelected={isFirstOptionSelected} />
+                <VotingOptions
+                  setIsFirstOptionSelected={setIsFirstOptionSelected}
+                  isFirstOptionSelected={isFirstOptionSelected}
+                />
                 <Button
                   label="Vote"
                   isLoading={isVoting}
@@ -519,6 +635,11 @@ export default function AccountCreationForm() {
                   handleRegister={maciVote}
                   color="pink"
                 />
+                {isVoting && (
+                  <div className="mt-2 h-1 w-full bg-neutral-200 dark:bg-neutral-600">
+                    <div className="h-1 bg-purple-500" style={{width: votingPercentage}}></div>
+                  </div>
+                )}
               </div>
             )}
 

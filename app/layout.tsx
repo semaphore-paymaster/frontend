@@ -7,7 +7,7 @@ import { ApolloWrapper } from "./apolloWrapper";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ZeroDev Passkeys + Session Keys Demo",
+  title: "Semaphore Paymaster",
   description: "",
 };
 

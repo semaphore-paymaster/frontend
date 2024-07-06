@@ -15,24 +15,24 @@ export default function Login({
 }: LoginProps) {
   return (
     <div className="flex flex-col space-y-2 mb-4">
-        <div>
+      <div>
         <Button
-            color="blue"
-            isLoading={isRegistering}
-            disabled={isLoggingIn}
-            handleRegister={handleRegister}
-            label="Register"
+          color="blue"
+          isLoading={isRegistering}
+          disabled={isLoggingIn}
+          handleRegister={handleRegister}
+          label="Register"
         />
-        </div>
-        <div className="h-full flex flex-col justify-end">
+      </div>
+      <div className="h-full flex flex-col justify-end">
         <Button
-            disabled={isRegistering}
-            color="pink"
-            isLoading={isLoggingIn}
-            handleRegister={handleLogin}
-            label="Login"
+          disabled={isRegistering}
+          color="pink"
+          isLoading={isLoggingIn}
+          handleRegister={handleLogin}
+          label="Login"
         />
-        </div>
+      </div>
     </div>
   );
 }

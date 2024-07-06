@@ -19,6 +19,7 @@
     "@zerodev/sdk": "5.3.2",
     "blockies-react-svg": "^0.0.13",
     "classnames": "^2.5.1",
+    "ethers": "^6.13.1",
     "file-loader": "^6.2.0",
     "maci-contracts": "^1.2.5",
     "maci-domainobjs": "^1.2.5",

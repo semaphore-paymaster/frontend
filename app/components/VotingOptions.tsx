@@ -15,7 +15,7 @@ export default function VotingOptions({
 
   return (
     <div className="flex flex-col items-center justify-center my-4">
-      <div className="grid w-[30rem] grid-cols-2 gap-2 rounded-xl bg-black p-2 border">
+      <div className="grid sm:grid-cols-2 grid-cols-1 gap-2 rounded-xl bg-black p-2 border">
         <div>
           <input
             readOnly
