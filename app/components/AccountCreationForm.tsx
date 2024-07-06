@@ -39,6 +39,7 @@ import { GATEKEEPER_ABI } from "../config/gatekeeper";
 import { STORAGE_ABI } from "../config/storage";
 import { GET_GROUP_DATA } from "../config/apollo";
 import { useQuery } from "@apollo/client";
+import Login from "./Login";
 
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
@@ -361,28 +362,15 @@ export default function AccountCreationForm() {
   return (
     <div className="grid grid-cols-1 gap-12">
       <div className="flex flex-col">
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <button
-              onClick={handleRegister}
-              disabled={isRegistering || isLoggingIn}
-              className="flex justify-center items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 w-full" // Added w-full for full width
-            >
-              {isRegistering ? <div className="spinner"></div> : "Register"}
-            </button>
-          </div>
-          <div>
-            <div className="h-full flex flex-col justify-end">
-              <button
-                onClick={handleLogin}
-                disabled={isLoggingIn || isRegistering}
-                className="flex justify-center items-center px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 w-full" // Matched the classes of the Register button
-              >
-                {isLoggingIn ? <div className="spinner"></div> : "Login"}
-              </button>
-            </div>
-          </div>
-        </div>
+        {!accountAddress && (
+          <Login
+            isLoggingIn={isLoggingIn}
+            isRegistering={isRegistering}
+            handleLogin={handleLogin}
+            handleRegister={handleRegister}
+          />
+        )}
+
         <div className="border-t-2 pt-4">
           {accountAddress && (
             <div className="mb-2 text-center font-medium">
