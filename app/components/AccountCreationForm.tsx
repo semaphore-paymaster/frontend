@@ -423,16 +423,12 @@ export default function AccountCreationForm() {
           semaphoreGroupIdentity,
           group,
           BigInt(0),
-          BigInt(1)
+          BigInt(parseInt(process.env.NEXT_PUBLIC_SEMAPHORE_GROUP_ID as string))
         );
 
         semaphoreProof = proof;
 
         const registerEncKeypair = new Keypair();
-
-        // const nn = PubKey.deserialize(
-        //   "macipk.2ffe72cc95f370f710076795c9b30de7f63c51d2fc7f3aed46dc6e08267fc221"
-        // );
 
         const registerPubKey = registerEncKeypair.pubKey;
         const registerPrivKey = registerEncKeypair.privKey;
@@ -448,7 +444,7 @@ export default function AccountCreationForm() {
           "0x0000000000000000000000000000000000000000000000000000000000000000";
 
         const callData = await kernelClient.account.encodeCallData({
-          to: process.env.NEXT_PUBLIC_MACI_FACTORY_CONTRACT,
+          to: process.env.NEXT_PUBLIC_MACI_FACTORY,
           value: BigInt(0),
           data: encodeFunctionData({
             abi: MACI_FACTORY_ABI,
@@ -486,7 +482,7 @@ export default function AccountCreationForm() {
         setVotingPercentage(55);
 
         const numSignUps = await publicClient.readContract({
-          address: process.env.NEXT_PUBLIC_MACI_FACTORY_CONTRACT as `0x${string}`,
+          address: process.env.NEXT_PUBLIC_MACI_FACTORY as `0x${string}`,
           abi: MACI_FACTORY_ABI,
           functionName: "numSignUps",
         });
