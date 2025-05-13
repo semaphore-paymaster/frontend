@@ -20,12 +20,15 @@ import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
 import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless";
 
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import type { WalletClient } from "viem";
 import {
   http,
   encodeFunctionData,
   encodeAbiParameters,
   parseAbiParameters,
   parseEventLogs,
+  verifyMessage,
+  recoverMessageAddress,
 } from "viem";
 
 import { Identity } from "@semaphore-protocol/identity";
@@ -59,15 +62,20 @@ import Button from "./Button";
 import VotingOptions from "./VotingOptions";
 import { MACI_FACTORY_ABI, MACI_POLL_ABI } from "../config/macyContracts";
 
-const sessionPrivateKey = generatePrivateKey();
-const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
-
-let sessionKeyAccount: any;
-let kernelClient: any;
-let semaphoreProof: any;
-let bundlerClient: any;
-
 export default function AccountCreationForm() {
+  // Smart Account Whitelist State - MOVED HERE
+  const [isAccountWhitelisted, setIsAccountWhitelisted] = useState(false);
+  const [isVerifyingAccountWhitelist, setIsVerifyingAccountWhitelist] = useState(false);
+  const [accountWhitelistError, setAccountWhitelistError] = useState("");
+
+  const sessionPrivateKey = generatePrivateKey();
+  const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
+
+  let sessionKeyAccount: any;
+  let kernelClient: any;
+  let semaphoreProof: any;
+  let bundlerClient: any;
+
   const [username, setUsername] = useState("semaphore-paymaster-account");
 
   const [accountAddress, setAccountAddress] = useState("");
@@ -84,12 +92,9 @@ export default function AccountCreationForm() {
   const [userOpHash, setUserOpHash] = useState("");
   const [userOpStatus, setUserOpStatus] = useState("");
   const [userOpCount, setUserOpCount] = useState(0);
-  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
-  const [isBalanceChecked, setIsBalanceChecked] = useState(false);
-  const [poapBalance, setPoapBalance] = useState("0");
+
   const [isSemaphoreGroupAssigned, setIsSemaphoreGroupAssigned] = useState(false);
   const [semaphoreGroupIdentity, setSemaphoreGroupIdentity] = useState<Identity>();
-
 
   const [semaphorePrivateKey, setSemaphorePrivateKey] = useState<string | Uint8Array | Buffer | undefined>();
   const [semaphorePublicKey, setSemaphorePublicKey] = useState<
@@ -145,7 +150,6 @@ export default function AccountCreationForm() {
 
     return encodedData;
   };
-
 
   const createAccountAndClient = async (passkeyValidator: any) => {
     const ecdsaSigner = await toECDSASigner({
@@ -250,6 +254,7 @@ export default function AccountCreationForm() {
 
     setIsKernelClientReady(true);
     setAccountAddress(sessionKeyAccount.address);
+    setIsLoggingIn(false);
   };
 
   const handleRegister = async () => {
@@ -292,17 +297,57 @@ export default function AccountCreationForm() {
     setIsLoggingIn(false);
   };
 
-  const checkPoapBalance = async (account: `0x${string}`) => {
-    setIsCheckingBalance(true);
-    const balance = await publicClient.getL1TokenBalance({
-      account,
-      token: process.env.NEXT_PUBLIC_POAP_CONTRACT as `0x${string}`,
-    });
+  const handleVerifySmartAccountWhitelist = async () => {
+    console.log("kernelClient", kernelClient);
+    if (!accountAddress) {
+      setAccountWhitelistError("Account not available. Please log in.");
+      return;
+    }
+    setIsVerifyingAccountWhitelist(true);
+    setAccountWhitelistError("");
 
-    setPoapBalance(balance.toString());
-    setIsCheckingBalance(false);
-    setIsBalanceChecked(true);
-    toast('You are elegible! 🎉');
+    if (!process.env.NEXT_PUBLIC_SMART_ACCOUNT_WHITELIST_URL) {
+      setAccountWhitelistError("Smart account whitelist URL not configured.");
+      setIsVerifyingAccountWhitelist(false);
+      return;
+    }
+
+    try {
+      // Client-side pre-check
+      const response = await fetch(process.env.NEXT_PUBLIC_SMART_ACCOUNT_WHITELIST_URL);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch smart account whitelist: ${response.statusText}`);
+      }
+      const whitelistData = await response.json();
+      if (!Array.isArray(whitelistData) || !whitelistData.every(item => typeof item === 'string')) {
+        throw new Error("Smart account whitelist data is not in the expected format (array of strings).");
+      }
+
+      const lowercasedWhitelist = whitelistData.map(addr => addr.toLowerCase());
+      if (!lowercasedWhitelist.includes(accountAddress.toLowerCase())) {
+        setAccountWhitelistError("Your smart account address is not in the whitelist.");
+        setIsAccountWhitelisted(false);
+        setIsVerifyingAccountWhitelist(false);
+        toast.error("Your smart account address is not whitelisted.");
+        return;
+      }
+
+      // If client-side check passes, proceed to send UserOperation for paymaster verification
+      // For now, let's assume this client-side check is enough and set as whitelisted
+      // The UserOperation part will be added next.
+      console.log("Client-side whitelist check passed. Next step: UserOp verification.");
+      // TODO: Send the actual UserOperation to be verified and sponsored by the paymaster
+      // For this phase, we'll simulate success after client check.
+      setIsAccountWhitelisted(true);
+      toast.success("Smart account whitelisted! (Client-side check for now)");
+
+    } catch (error: any) {
+      console.error("Error verifying smart account whitelist:", error);
+      setAccountWhitelistError(error.message || "Error during smart account whitelist verification.");
+      setIsAccountWhitelisted(false);
+    } finally {
+      setIsVerifyingAccountWhitelist(false);
+    }
   };
 
   const joinSemaphoreGroup = async () => {
@@ -423,7 +468,7 @@ export default function AccountCreationForm() {
           semaphoreGroupIdentity,
           group,
           BigInt(0),
-          BigInt(parseInt(process.env.NEXT_PUBLIC_SEMAPHORE_GROUP_ID as string))
+          BigInt(Number.parseInt(process.env.NEXT_PUBLIC_SEMAPHORE_GROUP_ID as string))
         );
 
         semaphoreProof = proof;
@@ -495,8 +540,7 @@ export default function AccountCreationForm() {
         console.log("r2: ", registerReceipt);
 
         console.log(
-          "View completed UserOp here: https://jiffyscan.xyz/userOpHash/" +
-            registerUserOpHash
+          `View completed UserOp here: https://jiffyscan.xyz/userOpHash/${registerUserOpHash}`
         );
 
         setVotingPercentage(66);
@@ -516,7 +560,7 @@ export default function AccountCreationForm() {
 
          const encKeypair = new Keypair();
 
-         const stateIndex = parseInt(numSignUps as string) - 1;
+         const stateIndex = Number.parseInt(numSignUps as string) - 1;
 
          // create the command object
          const command: PCommand = new PCommand(
@@ -576,11 +620,10 @@ export default function AccountCreationForm() {
          console.log(
            `r1: ${voteReceipt.success}, ${voteReceipt.sender}, ${voteReceipt.actualGasUsed}`
          );
-         console.log("r2: " + JSON.stringify(voteReceipt.receipt.transactionHash));
+         console.log(`r2: ${JSON.stringify(voteReceipt.receipt.transactionHash)}`);
 
          console.log(
-           "View completed UserOp here: https://jiffyscan.xyz/userOpHash/" +
-             userOpHash
+           `View completed UserOp here: https://jiffyscan.xyz/userOpHash/${userOpHash}`
          ); 
 
 
@@ -606,29 +649,40 @@ export default function AccountCreationForm() {
 
         <div className="pt-4">
           {accountAddress && <AddressAvatar accountAddress={accountAddress} />}
-          {accountAddress && !isBalanceChecked && (
-            <Button
-              label="Check Eligibility"
-              isLoading={isCheckingBalance}
-              disabled={isLoggingIn || isRegistering || isCheckingBalance}
-              handleRegister={async () =>
-                await checkPoapBalance(accountAddress as `0x${string}`)
-              }
-              color="red"
-            />
+
+          {/* Smart Account Whitelist Verification Section */}
+          {accountAddress && !isAccountWhitelisted && (
+            <div className="my-4 p-4 border rounded-lg shadow">
+              <h3 className="text-lg font-semibold mb-2">Account Whitelist Verification</h3>
+              <p className="mb-3 text-sm">
+                Your smart account address: {accountAddress}<br />
+                This address needs to be whitelisted to proceed.
+              </p>
+              <Button
+                label="Verify Whitelist Status"
+                isLoading={isVerifyingAccountWhitelist}
+                // disabled={isVerifyingAccountWhitelist || !accountAddress || !kernelClient}
+                handleRegister={handleVerifySmartAccountWhitelist}
+                color="blue"
+              />
+              {accountWhitelistError && (
+                <p className="mt-2 text-sm text-red-500">{accountWhitelistError}</p>
+              )}
+            </div>
+          )}
+          {accountAddress && isAccountWhitelisted && (
+            <div className="my-2 p-3 bg-green-100 text-green-700 rounded-md text-center">
+              Smart account successfully verified and whitelisted!
+            </div>
           )}
 
+          {/* "Join the group" button: 
+              Conditions related to old whitelist/POAP removed. 
+              Will be conditional on new smart account whitelist status later.
+          */}
           {accountAddress &&
-            isBalanceChecked &&
-            parseInt(poapBalance) === 0 && (
-              <div className="mb-2 text-center font-medium text-red-600">
-                You do not have any POAPs. You need at least one to join the
-                group.
-              </div>
-            )}
-
-          {accountAddress &&
-            parseInt(poapBalance) > 0 &&
+            isAccountWhitelisted &&
+            !isSemaphoreGroupAssigned && 
             !semaphoreGroupIdentity && (
               <div className="my-4">
                 <Button
@@ -641,7 +695,12 @@ export default function AccountCreationForm() {
               </div>
             )}
 
+          {/* "Vote" section: 
+              Conditions related to old whitelist/POAP removed.
+              Will be conditional on new smart account whitelist status later.
+          */}
           {accountAddress &&
+            isAccountWhitelisted &&
             isSemaphoreGroupAssigned &&
             semaphoreGroupIdentity &&
             !userHasVoted && (
@@ -660,7 +719,7 @@ export default function AccountCreationForm() {
                 />
                 {isVoting && (
                   <div className="mt-2 h-1 w-full bg-neutral-200 dark:bg-neutral-600">
-                    <div className="h-1 bg-purple-500" style={{width: votingPercentage}}></div>
+                    <div className="h-1 bg-purple-500" style={{width: `${votingPercentage}%`}} />
                   </div>
                 )}
               </div>
