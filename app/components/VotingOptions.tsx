@@ -14,8 +14,9 @@ export default function VotingOptions({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center my-4">
-      <div className="grid sm:grid-cols-2 grid-cols-1 gap-2 rounded-xl bg-black p-2 border">
+    <div className="flex flex-col items-center justify-center mb-6">
+      <h3 className="text-white/90 text-sm font-medium mb-3">Choose your preference:</h3>
+      <div className="grid sm:grid-cols-2 grid-cols-1 gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
         <div>
           <input
             readOnly
@@ -29,7 +30,7 @@ export default function VotingOptions({
           <label
             onClick={onClick}
             htmlFor="1"
-            className="block cursor-pointer select-none rounded-xl p-2 text-center peer-checked:bg-yellow-500 peer-checked:font-bold peer-checked:text-black"
+            className="block cursor-pointer select-none rounded-lg p-3 text-center text-sm transition-all duration-200 peer-checked:bg-gradient-to-r peer-checked:from-yellow-500 peer-checked:to-orange-500 peer-checked:text-black peer-checked:font-semibold text-white/70 hover:text-white hover:bg-white/5"
           >
             Pizza 🍕 + Pineapple 🍍
           </label>
@@ -43,11 +44,12 @@ export default function VotingOptions({
             id="2"
             value="2"
             className="peer hidden"
+            checked={!isFirstOptionSelected}
           />
           <label
             onClick={onClick}
             htmlFor="2"
-            className="block cursor-pointer select-none rounded-xl p-2 text-center peer-checked:bg-yellow-500 peer-checked:font-bold peer-checked:text-black"
+            className="block cursor-pointer select-none rounded-lg p-3 text-center text-sm transition-all duration-200 peer-checked:bg-gradient-to-r peer-checked:from-yellow-500 peer-checked:to-orange-500 peer-checked:text-black peer-checked:font-semibold text-white/70 hover:text-white hover:bg-white/5"
           >
             Just Pizza! 🍕
           </label>

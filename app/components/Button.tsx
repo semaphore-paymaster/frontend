@@ -18,20 +18,20 @@ export default function Button({
 
     const className = cx(
       {
-        "bg-blue-500 text-white hover:bg-blue-700 focus:ring-blue-500":
-          color === "blue",
-        "bg-purple-500 text-white hover:bg-purple-700 focus:ring-purple-500":
-          color === "purple",
-        "bg-green-500 text-white hover:bg-green-700 focus:ring-green-500":
-          color === "green",
-        "bg-red-500 text-white hover:bg-red-700 focus:ring-red-500":
-          color === "red",
-        "bg-pink-500 text-white hover:bg-pink-700 focus:ring-pink-500":
-          color === "pink",
-        "cursor-not-allowed bg-gray-300 hover:bg-gray-700 focus:ring-gray-500 text-gray-500":
+        "bg-blue-500/20 border-blue-500/50 text-blue-400 hover:bg-blue-500/30 hover:border-blue-400 focus:ring-blue-500/50":
+          color === "blue" && !disabled,
+        "bg-purple-500/20 border-purple-500/50 text-purple-400 hover:bg-purple-500/30 hover:border-purple-400 focus:ring-purple-500/50":
+          color === "purple" && !disabled,
+        "bg-green-500/20 border-green-500/50 text-green-400 hover:bg-green-500/30 hover:border-green-400 focus:ring-green-500/50":
+          color === "green" && !disabled,
+        "bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30 hover:border-red-400 focus:ring-red-500/50":
+          color === "red" && !disabled,
+        "bg-pink-500/20 border-pink-500/50 text-pink-400 hover:bg-pink-500/30 hover:border-pink-400 focus:ring-pink-500/50":
+          color === "pink" && !disabled,
+        "cursor-not-allowed bg-gray-500/10 border-gray-500/20 text-gray-500":
           disabled,
       },
-      "flex h-10 justify-center items-center px-4 py-2 rounded-lg focus:outline-none focus:ring-2  focus:ring-opacity-50 w-full"
+      "flex h-12 justify-center items-center px-6 py-3 rounded-xl backdrop-blur-sm border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-opacity-50 w-full font-medium"
     );
 
   return (
