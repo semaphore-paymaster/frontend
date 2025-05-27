@@ -43,10 +43,23 @@ export type InferredPasskeyValidator = Awaited<ReturnType<typeof toPasskeyValida
 const sessionPrivateKey = generatePrivateKey();
 const sessionKeySigner = privateKeyToAccount(sessionPrivateKey);
 
+// Helper function to check if an account is deployed
+const isAccountDeployed = async (address: string): Promise<boolean> => {
+  try {
+    const code = await publicClient.getCode({ address: address as `0x${string}` });
+    return code !== undefined && code !== "0x" && code.length > 2;
+  } catch (error) {
+    console.error("Error checking if account is deployed:", error);
+    return false;
+  }
+};
+
 export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProof | null>) => {
-  const sessionKeyAccountRef = useRef<KernelSmartAccount<typeof ENTRYPOINT_ADDRESS_V07> | null>(null);
-  const kernelClientRef = useRef<KernelAccountClient<typeof ENTRYPOINT_ADDRESS_V07> | null>(null);      
-  const bundlerClientRef = useRef<KernelAccountClient<typeof ENTRYPOINT_ADDRESS_V07> & BundlerActions<typeof ENTRYPOINT_ADDRESS_V07> | null>(null);
+  const sessionKeyAccountRef = useRef<any>(null);
+  const kernelClientRef = useRef<any>(null);      
+  const bundlerClientRef = useRef<any>(null);
+  const passkeyValidatorRef = useRef<InferredPasskeyValidator | null>(null);
+  const semaphoreKernelClientRef = useRef<any>(null); // Separate client for Semaphore operations
 
   const [accountAddress, setAccountAddress] = useState<string>("");
   const [isKernelClientReady, setIsKernelClientReady] = useState<boolean>(false);
@@ -55,6 +68,8 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
   const [username, setUsername] = useState<string>("semaphore-paymaster-account");
 
   const createAccountAndClient = useCallback(async (passkeyValidator: InferredPasskeyValidator) => {
+    // Store the passkey validator for potential reuse
+    passkeyValidatorRef.current = passkeyValidator;
     const ecdsaSigner = await toECDSASigner({
       signer: sessionKeySigner,
     });
@@ -84,7 +99,7 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
       entryPoint: ENTRYPOINT_ADDRESS_V07,
       middleware: {
         sponsorUserOperation: async ({ userOperation }) => {
-          console.log("🔥 MIDDLEWARE LOADED - NEW VERSION V2 🔥");
+          console.log("🔥 MIDDLEWARE LOADED - NEW VERSION V3 🔥");
           
           const currentSemaphoreProof = semaphoreProofRef.current;
           
@@ -103,6 +118,39 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
             entryPoint: ENTRYPOINT_ADDRESS_V07,
           });
 
+          // Check if account is deployed
+          const accountDeployed = await isAccountDeployed(userOperation.sender);
+          console.log("Paymaster Middleware: Account deployed?", accountDeployed);
+
+          // Check if this is a Semaphore group join operation (addMember)
+          const isAddMemberOperation = userOperation.callData?.includes('1783efc3');
+          
+          // If account is not deployed, this should be handled by the factory logic
+          if (!accountDeployed) {
+            console.log("Paymaster Middleware: Account not deployed, checking for factory data");
+            
+            // If no factory data is present, this is an error - the account should have factory data for deployment
+            if (!userOperation.factory || userOperation.factory === "0x" || userOperation.factory.length <= 2) {
+              console.error("Paymaster Middleware: Account not deployed and no factory data provided");
+              throw new Error("Account not deployed and no factory data provided. This should not happen with ZeroDev accounts.");
+            }
+            
+            // If this is also an addMember operation, it's a combined deployment + join operation
+            if (isAddMemberOperation) {
+              console.log("Paymaster Middleware: Detected combined Factory + addMember UserOp for sender:", userOperation.sender);
+              console.log("Paymaster Middleware: CallData contains addMember call, sponsoring via ZeroDev");
+            } else {
+              console.log("Paymaster Middleware: Detected Factory UserOp (account deployment only) for sender:", userOperation.sender);
+            }
+            
+            return zeroDevPaymaster.sponsorUserOperation({
+              userOperation,
+              entryPoint: ENTRYPOINT_ADDRESS_V07,
+            });
+          }
+
+          // Account is deployed, handle other transaction types
+          
           // Semaphore Proof UserOperation Logic (e.g., for voting)
           if (!userOperation.factory && currentSemaphoreProof) { 
             console.log("Paymaster Middleware: Detected Semaphore Proof UserOp for sender:", userOperation.sender);
@@ -137,7 +185,7 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
 
             let bundlerClientForGas = bundlerClientRef.current; 
             if (!bundlerClientForGas && kernelClientRef.current) { 
-                bundlerClientRef.current = (kernelClientRef.current as any).extend(bundlerActions(ENTRYPOINT_ADDRESS_V07));
+                bundlerClientRef.current = kernelClientRef.current.extend(bundlerActions(ENTRYPOINT_ADDRESS_V07));
                 bundlerClientForGas = bundlerClientRef.current;
             }
             if (!bundlerClientForGas) {
@@ -149,7 +197,7 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
                 userOperation: userOperation, 
                 entryPoint: ENTRYPOINT_ADDRESS_V07,
             };
-            const gasEstimates = await (bundlerClientForGas as any).estimateUserOperationGas(estimateArgs);
+            const gasEstimates = await bundlerClientForGas.estimateUserOperationGas(estimateArgs);
 
             const userOpWithPaymasterAndGas = {
               ...userOperation,
@@ -162,19 +210,11 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
             return userOpWithPaymasterAndGas;
           }
 
-          // Semaphore Group Join UserOperation Logic (addMember)
-          if (userOperation.callData?.includes('1783efc3')) {
-            console.log("Paymaster Middleware: Detected addMember UserOp for joining Semaphore group, sender:", userOperation.sender);
+          // Semaphore Group Join UserOperation Logic (addMember) - for already deployed accounts
+          if (isAddMemberOperation) {
+            console.log("Paymaster Middleware: Detected addMember UserOp for joining Semaphore group (deployed account), sender:", userOperation.sender);
             console.log("Paymaster Middleware: CallData:", userOperation.callData);
-            return zeroDevPaymaster.sponsorUserOperation({
-              userOperation,
-              entryPoint: ENTRYPOINT_ADDRESS_V07,
-            });
-          }
-
-          // Factory Deployment UserOperation Logic (Initial Account Creation)
-          if (userOperation.factory && userOperation.factory.length > 2 && userOperation.factory !== "0x") {
-            console.log("Paymaster Middleware: Detected Factory UserOp (account deployment) for sender:", userOperation.sender);
+            console.log("Paymaster Middleware: Using ZeroDev sponsorship for addMember operation");
             return zeroDevPaymaster.sponsorUserOperation({
               userOperation,
               entryPoint: ENTRYPOINT_ADDRESS_V07,
@@ -187,14 +227,30 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
           throw new Error("Paymaster: UserOperation not eligible for sponsorship by this policy.");
         },
       },
-    }) as any;
+    });
 
-    if(sessionKeyAccountRef.current && kernelClientRef.current) {
+    // Create a separate kernel client for Semaphore operations (no complex middleware)
+    semaphoreKernelClientRef.current = createKernelAccountClient({
+      account: sessionKeyAccountRef.current,
+      chain: CHAIN,
+      bundlerTransport: http(BUNDLER_URL),
+      entryPoint: ENTRYPOINT_ADDRESS_V07,
+      middleware: {
+        sponsorUserOperation: createZeroDevPaymasterClient({
+          chain: CHAIN,
+          transport: http(PAYMASTER_URL),
+          entryPoint: ENTRYPOINT_ADDRESS_V07,
+        }),
+      },
+    });
+
+    if(sessionKeyAccountRef.current && kernelClientRef.current && semaphoreKernelClientRef.current) {
         setIsKernelClientReady(true);
         setAccountAddress(sessionKeyAccountRef.current.address);
         console.log("[createAccountAndClient] kernelClientRef.current INITIALIZED:", kernelClientRef.current);
+        console.log("[createAccountAndClient] semaphoreKernelClientRef.current INITIALIZED:", semaphoreKernelClientRef.current);
     } else {
-        console.error("[createAccountAndClient] Failed to initialize sessionKeyAccountRef or kernelClientRef");
+        console.error("[createAccountAndClient] Failed to initialize sessionKeyAccountRef, kernelClientRef or semaphoreKernelClientRef");
     }
   }, [semaphoreProofRef]);
 
@@ -315,6 +371,7 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
     handleLogin,
     kernelClientRef,
     sessionKeyAccountRef,
-    bundlerClientRef
+    bundlerClientRef,
+    passkeyValidatorRef
   };
 };

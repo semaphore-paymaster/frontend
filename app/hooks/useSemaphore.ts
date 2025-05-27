@@ -6,118 +6,79 @@ import { encodeFunctionData, type Address, type Abi } from 'viem';
 import { Identity } from "@semaphore-protocol/identity";
 import { CHAIN } from "../config/zerodev";
 import { SEMAPHORE_PAYMASTER_ABI } from "../config/semaphore";
+import { publicClient } from "../config/viem";
 
 
 
 interface UseSemaphoreProps {
-  kernelClientRef: React.RefObject<KernelAccountClient<typeof ENTRYPOINT_ADDRESS_V07> | null>;
+  accountAddress: string;
   groupId: string | number | bigint;
   semaphorePaymasterAddress: Address;
-  buildSuccessMessage: (message: string, opHashLink?: string) => React.ReactNode;
-  setUserOpHash?: (hash: string) => void;
-  setUserOpCount?: (countUpdater: (prev: number) => number) => void;
 }
 
 export const useSemaphore = ({
-  kernelClientRef,
+  accountAddress,
   groupId,
   semaphorePaymasterAddress,
-  buildSuccessMessage,
-  setUserOpHash,
-  setUserOpCount,
 }: UseSemaphoreProps) => {
-  const [isJoiningSemahoreGroup, setIsJoiningSemaphoreGroup] = useState(false);
-  const [isSemaphoreGroupAssigned, setIsSemaphoreGroupAssigned] = useState(false);
-  const [semaphoreGroupIdentity, setSemaphoreGroupIdentity] = useState<Identity | null>(null);
-  const [semaphorePrivateKey, setSemaphorePrivateKey] = useState<string | Uint8Array | Buffer | undefined>();
-  const [semaphorePublicKey, setSemaphorePublicKey] = useState<string | Uint8Array | Buffer | undefined>(); 
+  const [isCheckingMembership, setIsCheckingMembership] = useState(false);
+  const [isMemberOfGroup, setIsMemberOfGroup] = useState<boolean | null>(null);
 
-  const joinSemaphoreGroup = useCallback(async () => {
-    const kernelClient = kernelClientRef.current;
-    if (!kernelClient || !kernelClient.account) { 
-      console.error("[useSemaphore/join] kernelClient or kernelClient.account is UNDEFINED. Cannot proceed.");
-      toast.error("Kernel client or account not available for joining group.");
-      setIsJoiningSemaphoreGroup(false); 
+  const checkGroupMembership = useCallback(async () => {
+    if (!accountAddress || !semaphorePaymasterAddress) {
       return;
     }
 
-    setIsJoiningSemaphoreGroup(true);
+    setIsCheckingMembership(true);
     try {
-      const identity = new Identity();
-      const { privateKey, publicKey, commitment } = identity;
+      console.log("[useSemaphore] Checking membership for account:", accountAddress);
+      
+      // Generate the identity commitment for this account address
+      // This is deterministic - same address always generates same identity commitment
+      const identity = new Identity(accountAddress);
+      const identityCommitment = identity.commitment;
+      
+      console.log("[useSemaphore] Generated identity commitment:", identityCommitment.toString());
+      
+      // Check if this identity commitment is a member of the group
+      const isMember = await publicClient.readContract({
+        address: semaphorePaymasterAddress,
+        abi: SEMAPHORE_PAYMASTER_ABI,
+        functionName: 'hasMember',
+        args: [BigInt(groupId), identityCommitment],
+      }) as boolean;
 
-      const sentUserOpHash = await kernelClient.sendUserOperation({
-        account: kernelClient.account,
-        userOperation: {
-          callData: await kernelClient.account.encodeCallData({
-            to: semaphorePaymasterAddress,
-            value: BigInt(0),
-            data: encodeFunctionData({
-              abi: SEMAPHORE_PAYMASTER_ABI,
-              functionName: "addMember",
-              args: [BigInt(groupId), commitment],
-            }),
-          }),
-        },
-      } as any);
+      // Also get group size for informational purposes
+      const groupSize = await publicClient.readContract({
+        address: semaphorePaymasterAddress,
+        abi: SEMAPHORE_PAYMASTER_ABI,
+        functionName: 'getMerkleTreeSize',
+        args: [BigInt(groupId)],
+      }) as bigint;
 
-      setSemaphorePrivateKey(privateKey as string);
-      setSemaphorePublicKey(publicKey.toString());
-      if (setUserOpHash) setUserOpHash(sentUserOpHash);
-
-      const localJoinBundlerClient = kernelClient.extend(bundlerActions(ENTRYPOINT_ADDRESS_V07)) as any;
-      if (!localJoinBundlerClient) {
-          console.error("[useSemaphore/join] localJoinBundlerClient is UNDEFINED after attempting init.");
-          toast.error("Bundler client not available. Cannot confirm transaction.");
-          setIsJoiningSemaphoreGroup(false);
-          return;
+      console.log("[useSemaphore] Group", groupId, "has", groupSize.toString(), "members");
+      console.log("[useSemaphore] Is member:", isMember);
+      
+      setIsMemberOfGroup(isMember);
+      
+      if (isMember) {
+        toast.success(`✅ You are a member of group ${groupId}!`);
+      } else {
+        toast.info(`Group ${groupId} has ${groupSize.toString()} members. You are not currently a member.`);
       }
-
-      if (setUserOpCount) setUserOpCount(prev => prev + 1);
-
-      const networkSlug = CHAIN.name.toLowerCase();
-      const opHashLink = `https://jiffyscan.xyz/userOpHash/${sentUserOpHash}?network=${networkSlug}`;
-      const successMessageNode = buildSuccessMessage("Transaction submitted! You are joining the group 😎", opHashLink) ;
-      toast(successMessageNode);
-
-      console.log("[useSemaphore/join] Waiting for UserOp receipt with hash:", sentUserOpHash);
-      try {
-        await localJoinBundlerClient.waitForUserOperationReceipt({ 
-          hash: sentUserOpHash,
-          timeout: 60000,
-        });
-        console.log("[useSemaphore/join] Transaction confirmed successfully!");
-      } catch (receiptError) {
-        console.warn("[useSemaphore/join] Receipt timeout, but transaction was submitted:", receiptError);
-      }
-
-      setIsSemaphoreGroupAssigned(true);
-      setSemaphoreGroupIdentity(identity);
-    } catch (error: unknown) {
-        console.error("Error during joinSemaphoreGroup (in hook):", error);
-        let errorMessage = "Failed to join Semaphore group.";
-        if (error instanceof Error) { errorMessage = error.message; }
-        toast.error(errorMessage);
-        setIsSemaphoreGroupAssigned(false); 
-        setSemaphoreGroupIdentity(null);
+      
+    } catch (error) {
+      console.error("[useSemaphore] Error checking membership:", error);
+      toast.error("Failed to check group membership");
+      setIsMemberOfGroup(null);
     } finally {
-        setIsJoiningSemaphoreGroup(false);
+      setIsCheckingMembership(false);
     }
-  }, [
-    kernelClientRef, 
-    groupId, 
-    semaphorePaymasterAddress,
-    buildSuccessMessage,
-    setUserOpHash,
-    setUserOpCount,
-  ]);
+  }, [accountAddress, groupId, semaphorePaymasterAddress]);
 
   return {
-    isJoiningSemahoreGroup,
-    isSemaphoreGroupAssigned,
-    semaphoreGroupIdentity,
-    semaphorePrivateKey, 
-    semaphorePublicKey,  
-    joinSemaphoreGroup,
+    isCheckingMembership,
+    isMemberOfGroup,
+    checkGroupMembership,
   };
 }; 

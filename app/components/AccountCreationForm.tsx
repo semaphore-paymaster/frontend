@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 import { parseAbi } from "viem";
 
@@ -19,7 +19,7 @@ import { useSmartAccount } from "../hooks/useSmartAccount";
 import { useWhitelistVerification } from "../hooks/useWhitelistVerification";
 import { useSemaphore } from "../hooks/useSemaphore";
 
-import { SEMAPHORE_PAYMASTER_ABI_SNIPPET } from "../config/semaphore";
+import { SEMAPHORE_PAYMASTER_ABI } from "../config/semaphore";
 
 
 export default function AccountCreationForm() {
@@ -39,6 +39,7 @@ export default function AccountCreationForm() {
     handleRegister,
     handleLogin,
     kernelClientRef,
+    passkeyValidatorRef,
   } = useSmartAccount(semaphoreProofRef);
 
   const {
@@ -63,22 +64,25 @@ export default function AccountCreationForm() {
     )
   };
 
-  const semaphorePaymasterContractAddress = process.env.NEXT_PUBLIC_SEMAPHORE_PAYMASTER_CONTRACT_ADDRESS as `0x${string}` | undefined;
+  const semaphorePaymasterContractAddress = process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT as `0x${string}` | undefined;
 
   const {
-    isJoiningSemahoreGroup,    
-    isSemaphoreGroupAssigned,
-    semaphoreGroupIdentity,
-    joinSemaphoreGroup,       
+    isCheckingMembership,
+    isMemberOfGroup,
+    checkGroupMembership,
   } = useSemaphore({
-    kernelClientRef,
+    accountAddress,
     groupId: GROUP_ID, 
     semaphorePaymasterAddress: semaphorePaymasterContractAddress || "0x", 
-    semaphorePaymasterAbi: SEMAPHORE_PAYMASTER_ABI_SNIPPET, 
-    buildSuccessMessage, 
-    setUserOpHash,       
-    setUserOpCount,      
   });
+
+  // Check group membership when account is ready
+  useEffect(() => {
+    if (isKernelClientReady && accountAddress && isMemberOfGroup === null) {
+      console.log("[AccountCreationForm] Checking group membership");
+      checkGroupMembership();
+    }
+  }, [isKernelClientReady, accountAddress, isMemberOfGroup, checkGroupMembership]);
   
 
   // Remaining local state for voting etc.
@@ -93,7 +97,7 @@ export default function AccountCreationForm() {
     "isKernelClientReady:", isKernelClientReady, 
     "accountAddress:", accountAddress, 
     "isAccountWhitelisted from hook:", isAccountWhitelisted,
-    "isJoiningSemaphoreGroup from hook:", isJoiningSemahoreGroup 
+    "isMemberOfGroup:", isMemberOfGroup 
   );
 
 
@@ -124,52 +128,59 @@ export default function AccountCreationForm() {
             </div>
           )}
 
-          {/* "Join the group" button: Uses isAccountWhitelisted from hook */}
-          {accountAddress &&
-            (isAccountWhitelisted || true) && 
-            !isSemaphoreGroupAssigned &&
-            !semaphoreGroupIdentity && (
-              <div className="text-center">
-                <Button
-                  label="Join the group"
-                  isLoading={isJoiningSemahoreGroup}
-                  disabled={!isKernelClientReady || isJoiningSemahoreGroup}
-                  handleRegister={joinSemaphoreGroup}
-                  color="green"
-                />
-              </div>
-            )}
-
-          {/* "Vote" section: Uses isAccountWhitelisted from hook */}
-          {accountAddress &&
-            (isAccountWhitelisted || true) && 
-            isSemaphoreGroupAssigned &&
-            semaphoreGroupIdentity &&
-            !userHasVoted && (
-              <div className="text-center space-y-4">
-                <VotingOptions
-                  setIsFirstOptionSelected={setIsFirstOptionSelected}
-                  isFirstOptionSelected={isFirstOptionSelected}
-                />
-                <Button
-                  label="Vote"
-                  isLoading={isVoting}
-                  disabled={!isKernelClientReady || isVoting}
-                  handleRegister={maciVote}
-                  color="pink"
-                />
-                {isVoting && (
-                  <div className="mt-3">
-                    <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-300" 
-                        style={{width: `${votingPercentage}%`}} 
-                      />
-                    </div>
+          {/* Group membership status */}
+          {accountAddress && (
+            <div className="text-center space-y-4">
+              {isCheckingMembership && (
+                <div className="inline-flex items-center px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-full">
+                  <span className="text-blue-400 font-medium">Checking group membership...</span>
+                </div>
+              )}
+              
+              {isMemberOfGroup === true && (
+                <div className="space-y-4">
+                  <div className="inline-flex items-center px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-full">
+                    <span className="text-green-400 font-medium">✓ You are a member of the group</span>
                   </div>
-                )}
-              </div>
-            )}
+                  <div className="inline-flex items-center px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-full">
+                    <span className="text-purple-400 font-medium">Continue with voting</span>
+                  </div>
+                  
+                  {!userHasVoted && (
+                    <div className="space-y-4">
+                      <VotingOptions
+                        setIsFirstOptionSelected={setIsFirstOptionSelected}
+                        isFirstOptionSelected={isFirstOptionSelected}
+                      />
+                      <Button
+                        label="Vote"
+                        isLoading={isVoting}
+                        disabled={!isKernelClientReady || isVoting}
+                        handleRegister={maciVote}
+                        color="pink"
+                      />
+                      {isVoting && (
+                        <div className="mt-3">
+                          <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-300" 
+                              style={{width: `${votingPercentage}%`}} 
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {isMemberOfGroup === false && (
+                <div className="inline-flex items-center px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-full">
+                  <span className="text-red-400 font-medium">You are not part of the group</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {userHasVoted && (
             <div className="text-center">
