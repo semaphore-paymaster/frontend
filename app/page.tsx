@@ -4,15 +4,15 @@ import CrystalAnimationWrapper from "./components/CrystalAnimationWrapper";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen">
+    <main className="flex flex-col md:flex-row min-h-screen">
       {/* Left Side - 3D Animation */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="hidden md:flex md:flex-1 relative overflow-hidden">
         <CrystalAnimationWrapper />
         <div className="absolute inset-0 bg-gradient-to-r from-transparent to-slate-900/20 pointer-events-none" />
       </div>
       
       {/* Right Side - Login Form */}
-      <div className="flex-1 flex items-center justify-center px-8 py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="w-full md:flex-1 flex items-center justify-center px-8 py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="w-full max-w-md">
           <div className="text-center mb-12">
             <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">

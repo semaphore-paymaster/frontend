@@ -134,7 +134,7 @@ export default function CrystalAnimation() {
   return (
     <div 
       ref={containerRef}
-      className="w-full h-full relative overflow-hidden"
+      className="hidden md:block w-full h-full relative overflow-hidden"
       style={{
         background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)'
       }}
