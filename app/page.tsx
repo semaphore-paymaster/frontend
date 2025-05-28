@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ToastContainer } from "react-toastify";
+import { ToastContainer, type TypeOptions } from "react-toastify";
 import cn from "classnames";
 import AccountManager from "./components/AccountManager";
 import CrystalAnimationWrapper from "./components/CrystalAnimationWrapper";
@@ -19,7 +19,7 @@ export default function Home() {
       )}
       
       <div className={cn(
-        "w-full flex items-center justify-center px-8 py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900",
+        "w-full flex items-center justify-center px-4 py-4 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900",
         {
           "md:flex-1": showCrystalAnimation
         }
@@ -31,13 +31,15 @@ export default function Home() {
           }
         )}>
           <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
-              Semaphore
-            </h1>
-            <h2 className="text-2xl font-light text-blue-400 mb-2">
-              Paymaster
-            </h2>
-            <p className="text-slate-400 text-sm leading-relaxed">
+            <div className="flex items-center justify-center space-x-2 mb-4">
+              <img src="/logo.png" alt="Semaphore Logo" className="h-48 w-auto" />
+            </div>
+            <p className={cn(
+          "text-slate-400 text-sm leading-relaxed",
+          {
+            "hidden": !showCrystalAnimation
+          }
+        )} >
               Privacy-preserving authentication with zero-knowledge proofs
             </p>
           </div>
@@ -65,6 +67,24 @@ export default function Home() {
         draggable
         pauseOnHover
         theme="dark"
+        toastClassName={
+          "relative flex p-1 min-h-10 rounded-md justify-between overflow-hidden cursor-pointer " +
+          "bg-slate-700/50 backdrop-blur-md border border-slate-600/50 shadow-lg " +
+          "my-2 mx-2 sm:mx-0"
+        }
+        bodyClassName="text-sm font-medium text-slate-100 block p-3"
+        progressClassName={(context?: { type?: TypeOptions; defaultClassName?: string; }) => {
+          const colorMapping: { [key in TypeOptions | 'default']: string } = {
+            success: "from-green-500 to-green-400",
+            error: "from-red-500 to-red-400",
+            info: "from-blue-500 to-blue-400",
+            warning: "from-yellow-500 to-yellow-400",
+            default: "from-pink-500 to-purple-500",
+          };
+          const type = context?.type || "default";
+          const bgColor = colorMapping[type] || colorMapping.default;
+          return `h-1 bg-gradient-to-r ${bgColor} rounded-b-md`;
+        }}
       />
     </main>
   );

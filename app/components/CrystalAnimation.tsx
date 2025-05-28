@@ -17,227 +17,189 @@ const themes = {
     sparkleShadow: '#ec4899',
   },
 };
-const themeKeys = Object.keys(themes) as (keyof typeof themes)[];
 
-function Crystal({ 
-  className, 
-  size = 'w-8 h-8', 
+type ThemeKey = keyof typeof themes;
+const themeKeys = Object.keys(themes) as ThemeKey[];
+
+interface CrystalProps {
+  initialTheme: ThemeKey;
+  delay?: number;
+  positionClasses?: string;
+  sizeClasses?: string;
+}
+
+function Crystal({
+  initialTheme,
   delay = 0,
-  initialColorTheme
-}: {
-  className?: string
-  size?: string
-  delay?: number 
-  initialColorTheme: keyof typeof themes
-}) {
-  const crystalRef = useRef<HTMLDivElement>(null)
-  const [activeColorTheme, setActiveColorTheme] = useState(initialColorTheme);
-  const currentTheme = themes[activeColorTheme];
-  const animationRef = useRef<gsap.core.Timeline | null>(null); 
-  const currentBurstAnimation = useRef<gsap.core.Tween | null>(null);
+  positionClasses = 'top-1/2 left-1/2',
+  sizeClasses = 'w-8 h-8',
+}: CrystalProps) {
+  const crystalRef = useRef<HTMLDivElement>(null);
+  const floatTween = useRef<gsap.core.Tween | null>(null);
+  const rotateTween = useRef<gsap.core.Tween | null>(null);
+  const scaleTween = useRef<gsap.core.Tween | null>(null);
+  const currentTheme = themes[initialTheme];
 
-  const setupBaseAnimations = useCallback(() => {
-    if (!crystalRef.current) return;
-    if (animationRef.current) {
-      animationRef.current.kill();
-    }
-
-    const currentX = gsap.getProperty(crystalRef.current, "x");
-    const currentY = gsap.getProperty(crystalRef.current, "y");
-    const currentRotation = gsap.getProperty(crystalRef.current, "rotation");
-    const currentScale = gsap.getProperty(crystalRef.current, "scale");
-
-    const tl = gsap.timeline({ 
-      repeat: -1, 
-      delay: delay,
-      onRepeat: () => {
-        tl.vars.delay = 0;
-      }
-    });
-    
-    tl.set(crystalRef.current, { 
-        x: currentX, 
-        y: currentY,
-        rotation: currentRotation,
-        scale: currentScale,
-      })
-      .to(crystalRef.current, {
-        y: "-=20",
-        duration: 2 + Math.random() * 2,
-        yoyo: true,
-        ease: "power2.inOut",
-      }, "<+=0")
-      .to(crystalRef.current, {
-        rotation: "+=360",
-        duration: 8 + Math.random() * 4,
-        ease: "none"
-      }, 0)
-      .to(crystalRef.current, {
-        scale: "+=0.1",
-        duration: 3 + Math.random() * 2,
-        yoyo: true,
-        ease: "power2.inOut",
-      }, "<+=0");
-      
-    animationRef.current = tl;
-  }, [delay]);
+  const [stableInitialAttrs] = useState(() => ({
+    rotation: Math.random() * 360,
+    scale: 0.7 + Math.random() * 0.6, 
+  }));
 
   useEffect(() => {
-    if (crystalRef.current) {
-        gsap.set(crystalRef.current, {
-            rotation: Math.random() * 360,
-            scale: 0.5 + Math.random() * 0.5,
-        });
-        setupBaseAnimations();
-    }
+    if (!crystalRef.current) return;
+
+    // Kill any existing tweens
+    if (floatTween.current) floatTween.current.kill();
+    if (rotateTween.current) rotateTween.current.kill();
+    if (scaleTween.current) scaleTween.current.kill();
+
+    // Set initial state
+    gsap.set(crystalRef.current, {
+      x: 0,
+      y: 0,
+      rotation: stableInitialAttrs.rotation,
+      scale: stableInitialAttrs.scale,
+      opacity: 0.7, 
+    });
+
+    // Create separate tweens for each animation
+    // Floating animation
+    floatTween.current = gsap.to(crystalRef.current, {
+      y: "-=30",
+      duration: 2 + Math.random() * 2,
+      ease: "power1.inOut",
+      yoyo: true,
+      repeat: -1,
+      delay: delay,
+    });
+
+    // Rotation animation
+    rotateTween.current = gsap.to(crystalRef.current, {
+      rotation: "+=360",
+      duration: 8 + Math.random() * 4,
+      ease: "none",
+      repeat: -1,
+      delay: delay,
+    });
+
+    // Scale animation
+    scaleTween.current = gsap.to(crystalRef.current, {
+      scale: stableInitialAttrs.scale * 1.15,
+      duration: 3 + Math.random() * 2,
+      ease: "power2.inOut",
+      yoyo: true,
+      repeat: -1,
+      delay: delay,
+    });
 
     return () => {
-      if (animationRef.current) {
-        animationRef.current.kill();
+      if (floatTween.current) {
+        floatTween.current.kill();
+        floatTween.current = null;
       }
-      if (currentBurstAnimation.current) {
-        currentBurstAnimation.current.kill();
+      if (rotateTween.current) {
+        rotateTween.current.kill();
+        rotateTween.current = null;
+      }
+      if (scaleTween.current) {
+        scaleTween.current.kill();
+        scaleTween.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setupBaseAnimations]); 
-
-  const handleClick = useCallback(() => {
-    if (crystalRef.current) {
-      // Kill any ongoing base animations and previous burst animations
-      if (animationRef.current) {
-        animationRef.current.kill();
-        animationRef.current = null;
-      }
-      if (currentBurstAnimation.current) {
-        currentBurstAnimation.current.kill();
-      }
-
-      // Toggle color theme
-      const nextColorTheme = activeColorTheme === 'blue' ? 'pink' : 'blue';
-      setActiveColorTheme(nextColorTheme);
-
-      const angle = Math.random() * Math.PI * 2;
-      const distance = 100 + Math.random() * 100;
-      const duration = 0.5 + Math.random() * 0.5;
-
-      const targetX = `+=${Math.cos(angle) * distance}`;
-      const targetY = `+=${Math.sin(angle) * distance}`;
-      const targetRotation = `+=${(Math.random() - 0.5) * 720}`;
-
-      console.log(`[Crystal Click] Bursting to: X:${targetX}, Y:${targetY}, Rot:${targetRotation}`);
-
-      currentBurstAnimation.current = gsap.to(crystalRef.current, {
-        x: targetX,
-        y: targetY,
-        rotation: targetRotation,
-        duration: duration,
-        ease: "power1.out",
-        onComplete: () => {
-          console.log("[Crystal Click] Burst complete. Restarting base animations.");
-          setupBaseAnimations(); 
-        }
-      });
-    }
-  }, [setupBaseAnimations, activeColorTheme]);
-
-  const handleKeyboardClick = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      handleClick();
-    }
-  }, [handleClick]);
+  }, [delay, stableInitialAttrs]);
 
   return (
     <div
       ref={crystalRef}
-      className={`absolute ${size} ${className} cursor-pointer`}
+      className={`absolute ${positionClasses} ${sizeClasses}`}
       style={{
         background: currentTheme.gradient,
         clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
         filter: `drop-shadow(0 0 10px ${currentTheme.shadowColor})`,
-        opacity: 0.7
       }}
-      onClick={handleClick}
-      onKeyDown={handleKeyboardClick}
-      tabIndex={0}
-      role="button"
     />
-  )
+  );
 }
 
+interface SparkleProps {
+  initialTheme: ThemeKey;
+  delay?: number;
+  positionClasses?: string;
+}
 
-function Sparkle({ 
-  className, 
+function Sparkle({
+  initialTheme,
   delay = 0,
-  initialColorTheme 
-}: { 
-  className?: string
-  delay?: number 
-  initialColorTheme: keyof typeof themes 
-}) {
-  const sparkleRef = useRef<HTMLDivElement>(null)
-  const currentTheme = themes[initialColorTheme];
+  positionClasses = 'top-1/2 left-1/2',
+}: SparkleProps) {
+  const sparkleRef = useRef<HTMLDivElement>(null);
+  const animationTimeline = useRef<gsap.core.Timeline | null>(null);
+  const currentTheme = themes[initialTheme];
 
   useEffect(() => {
-    if (sparkleRef.current) {
-      gsap.set(sparkleRef.current, {
-        scale: 0,
-        rotation: Math.random() * 360
-      })
+    if (!sparkleRef.current) return;
 
-      // Twinkling animation
-      gsap.to(sparkleRef.current, {
+    if (animationTimeline.current) {
+      animationTimeline.current.kill();
+      animationTimeline.current = null;
+    }
+
+    gsap.set(sparkleRef.current, {
+      scale: 0,
+      rotation: Math.random() * 360,
+    });
+
+    const tl = gsap.timeline({
+        delay: delay,
+        repeat: -1,
+        repeatDelay: 1 + Math.random() * 2, // Staggered repeat for twinkling
+    });
+    
+    tl.to(sparkleRef.current, {
         scale: 1,
         duration: 0.5,
-        repeat: -1,
-        yoyo: true,
         ease: "power2.inOut",
-        delay: delay,
-        repeatDelay: 1 + Math.random() * 2
+        yoyo: true,
       })
-
-      // Rotation
-      gsap.to(sparkleRef.current, {
+      .to(sparkleRef.current, {
         rotation: "+=360",
         duration: 4,
-        repeat: -1,
-        ease: "none"
-      })
-    }
-  }, [delay])
+        ease: "none",
+      }, "<0");
+    
+    animationTimeline.current = tl;
+
+    return () => {
+      if (animationTimeline.current) {
+        animationTimeline.current.kill();
+        animationTimeline.current = null;
+      }
+    };
+  }, [delay]);
 
   return (
     <div
       ref={sparkleRef}
-      className={`absolute w-1 h-1 ${className}`}
+      className={`absolute w-1 h-1 ${positionClasses}`}
       style={{
         background: currentTheme.sparkleBase,
         borderRadius: '50%',
         boxShadow: `0 0 6px ${currentTheme.sparkleShadow}`,
       }}
     />
-  )
+  );
 }
 
 export default function CrystalAnimation() {
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (containerRef.current) {
-      gsap.fromTo(containerRef.current, 
-        { opacity: 0 },
-        { opacity: 1, duration: 1.5, ease: "power2.out" }
-      )
-    }
-  }, [])
-
-  const getRandomTheme = useCallback(() => {
+  const getRandomTheme = useCallback((): ThemeKey => {
     return themeKeys[Math.floor(Math.random() * themeKeys.length)];
   }, []);
 
+  // Helper to generate random percentage for positioning
+  const getRandomPosition = () => `${Math.floor(Math.random() * 80) + 10}%`;
+
   return (
     <div 
-      ref={containerRef}
       className="hidden md:block w-full h-full relative overflow-hidden"
       style={{
         background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' 
@@ -250,37 +212,37 @@ export default function CrystalAnimation() {
         }}
       />
       
-      {/* Large crystals - Mix of blue and pink */}
-      <Crystal className="top-1/4 left-1/4" size="w-12 h-12" delay={0} initialColorTheme={getRandomTheme()} />
-      <Crystal className="top-1/3 right-1/4" size="w-10 h-10" delay={0.5} initialColorTheme={getRandomTheme()} />
-      <Crystal className="bottom-1/3 left-1/3" size="w-14 h-14" delay={1} initialColorTheme={getRandomTheme()} />
-      <Crystal className="bottom-1/4 right-1/3" size="w-8 h-8" delay={1.5} initialColorTheme={getRandomTheme()} />
-      <Crystal className="top-1/2 left-1/2" size="w-6 h-6" delay={2} initialColorTheme={getRandomTheme()} />
+      {/* Large crystals */}
+      <Crystal initialTheme={getRandomTheme()} delay={0} positionClasses="top-1/4 left-1/4" sizeClasses="w-12 h-12" />
+      <Crystal initialTheme={getRandomTheme()} delay={0.5} positionClasses="top-1/3 right-1/4" sizeClasses="w-10 h-10" />
+      <Crystal initialTheme={getRandomTheme()} delay={1} positionClasses="bottom-1/3 left-1/3" sizeClasses="w-14 h-14" />
+      <Crystal initialTheme={getRandomTheme()} delay={1.5} positionClasses="bottom-1/4 right-1/3" sizeClasses="w-8 h-8" />
+      <Crystal initialTheme={getRandomTheme()} delay={2} positionClasses="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" sizeClasses="w-6 h-6" />
       
-      {/* Medium crystals - Mix of blue and pink */}
-      <Crystal className="top-1/5 left-1/2" size="w-6 h-6" delay={0.3} initialColorTheme={getRandomTheme()} />
-      <Crystal className="top-2/3 right-1/5" size="w-8 h-8" delay={0.8} initialColorTheme={getRandomTheme()} />
-      <Crystal className="bottom-1/5 left-1/5" size="w-5 h-5" delay={1.3} initialColorTheme={getRandomTheme()} />
+      {/* Medium crystals */}
+      <Crystal initialTheme={getRandomTheme()} delay={0.3} positionClasses="top-1/5 left-1/2 -translate-x-1/2" sizeClasses="w-6 h-6" />
+      <Crystal initialTheme={getRandomTheme()} delay={0.8} positionClasses="top-2/3 right-1/5" sizeClasses="w-8 h-8" />
+      <Crystal initialTheme={getRandomTheme()} delay={1.3} positionClasses="bottom-1/5 left-1/5" sizeClasses="w-5 h-5" />
       
-      {/* Small sparkles - Mix of blue and pink */}
-      {Array.from({ length: 20 }, (_, i) => (
+      {/* Small sparkles */}
+      {Array.from({ length: 25 }).map((_, i) => (
         <Sparkle
-          key={`sparkle-${Math.random().toString(36).substr(2, 9)}-${i}`}
-          className={`top-${Math.floor(Math.random() * 80) + 10}% left-${Math.floor(Math.random() * 80) + 10}%`}
+          key={`sparkle-${i}`}
+          initialTheme={getRandomTheme()}
           delay={Math.random() * 3}
-          initialColorTheme={getRandomTheme()} // Random theme for sparkles
+          positionClasses={`top-[${getRandomPosition()}] left-[${getRandomPosition()}]`}
         />
       ))}
       
-      {/* Floating particles - Keeping these blue for now, or could also be themed */}
-      <div className="absolute inset-0 pointer-events-none"> {/* Added pointer-events-none */} 
-        {Array.from({ length: 15 }, (_, i) => (
+      {/* Floating particles (CSS animation) */}
+      <div className="absolute inset-0 pointer-events-none">
+        {Array.from({ length: 15 }).map((_, i) => (
           <div
-            key={`particle-${Math.random().toString(36).substr(2, 9)}-${i}`}
+            key={`particle-${i}`}
             className="absolute w-1 h-1 bg-blue-400 rounded-full opacity-30"
             style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
+              top: getRandomPosition(),
+              left: getRandomPosition(),
               animation: `float ${3 + Math.random() * 4}s ease-in-out infinite ${Math.random() * 2}s`,
               boxShadow: '0 0 4px rgba(96, 165, 250, 0.5)'
             }}
@@ -288,7 +250,6 @@ export default function CrystalAnimation() {
         ))}
       </div>
 
-      {/* CSS animations for floating particles */}
       <style jsx>{`
         @keyframes float {
           0%, 100% { transform: translateY(0px) rotate(0deg); }
@@ -296,5 +257,5 @@ export default function CrystalAnimation() {
         }
       `}</style>
     </div>
-  )
+  );
 }
