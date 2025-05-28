@@ -39,7 +39,7 @@ export const useWhitelistVerification = ({
     }
     
     // This hook will manage its own bundler client instance derived from kernelClient
-    const localBundlerClient = kernelClient.extend(bundlerActions(ENTRYPOINT_ADDRESS_V07));
+    const localBundlerClient = (kernelClient as any).extend(bundlerActions(ENTRYPOINT_ADDRESS_V07));
     if (!localBundlerClient) {
         setAccountWhitelistError("Failed to create bundler client for verification.");
         console.error("[useWhitelistVerification] localBundlerClient could not be created.");

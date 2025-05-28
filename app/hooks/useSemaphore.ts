@@ -35,8 +35,9 @@ export const useSemaphore = ({
       
       // Generate the identity commitment for this account address
       // This is deterministic - same address always generates same identity commitment
-      const identity = new Identity(accountAddress);
-      const identityCommitment = identity.commitment;
+      // Using the same logic as generate-commitment.js
+      const id = new Identity(accountAddress);
+      const identityCommitment = id.commitment;
       
       console.log("[useSemaphore] Generated identity commitment:", identityCommitment.toString());
       

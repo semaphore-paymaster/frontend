@@ -203,6 +203,8 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
               ...userOperation,
               ...gasEstimates,
               paymaster: process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT, 
+              paymasterVerificationGasLimit: BigInt(200000), // Increased from 100000
+              paymasterPostOpGasLimit: BigInt(100000), // Increased from 50000
               paymasterData,
             };
 
@@ -236,11 +238,14 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
       bundlerTransport: http(BUNDLER_URL),
       entryPoint: ENTRYPOINT_ADDRESS_V07,
       middleware: {
-        sponsorUserOperation: createZeroDevPaymasterClient({
-          chain: CHAIN,
-          transport: http(PAYMASTER_URL),
-          entryPoint: ENTRYPOINT_ADDRESS_V07,
-        }),
+        sponsorUserOperation: async (args) => {
+          const paymasterClient = createZeroDevPaymasterClient({
+            chain: CHAIN,
+            transport: http(PAYMASTER_URL),
+            entryPoint: ENTRYPOINT_ADDRESS_V07,
+          });
+          return await paymasterClient.sponsorUserOperation(args);
+        },
       },
     });
 
