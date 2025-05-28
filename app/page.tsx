@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { ToastContainer, type TypeOptions } from "react-toastify";
 import cn from "classnames";
-import AccountManager from "./components/AccountManager";
-import CrystalAnimationWrapper from "./components/CrystalAnimationWrapper";
+import AccountManager from "./features/account/AccountManager";
+import CrystalAnimationWrapper from "./components/animations/CrystalAnimationWrapper";
 
 export default function Home() {
   const [showCrystalAnimation, setShowCrystalAnimation] = useState(true);
@@ -12,7 +12,7 @@ export default function Home() {
   return (
     <main className="flex flex-col md:flex-row min-h-screen">
       {showCrystalAnimation && (
-        <div className="hidden md:flex md:flex-1 relative overflow-hidden">
+        <div className="hidden lg:flex lg:flex-1 relative overflow-hidden">
           <CrystalAnimationWrapper />
           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-slate-900/20 pointer-events-none" />
         </div>

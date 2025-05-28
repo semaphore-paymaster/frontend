@@ -4,18 +4,18 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { encodeFunctionData } from "viem";
 import { bundlerActions, ENTRYPOINT_ADDRESS_V07, type BundlerActions } from 'permissionless';
 import { toast } from 'react-toastify';
-import { publicClient } from "../config/viem";
+import { publicClient } from "../../config/viem";
 import { Identity } from "@semaphore-protocol/identity";
 import { Group } from "@semaphore-protocol/group";
 import { generateProof } from "@semaphore-protocol/proof";
 import type { SemaphoreProof } from "@semaphore-protocol/proof";
 import type { KernelAccountClient } from '@zerodev/sdk';
 
-import { GROUP_ID } from "../utils/constants";
-import { SEMAPHORE_PAYMASTER_ABI } from "../config/semaphore";
-import { VOTING_CONTRACT_ABI, VOTING_CONTRACT_ADDRESS, VOTE_CHOICES } from "../config/voting";
+import { GROUP_ID } from "../../utils/constants";
+import { SEMAPHORE_PAYMASTER_ABI } from "../../config/semaphore";
+import { VOTING_CONTRACT_ABI, VOTING_CONTRACT_ADDRESS, VOTE_CHOICES } from "../../config/voting";
 
-import Button from "./Button";
+import Button from "../../components/ui/Button";
 
 interface VotingComponentProps {
   accountAddress: string;
@@ -44,18 +44,8 @@ export default function VotingComponent({
   const [isFirstOptionSelected, setIsFirstOptionSelected] = useState(true);
   const [votingPercentage, setVotingPercentage] = useState(5);
   const [voteCounts, setVoteCounts] = useState({ votesA: BigInt(0), votesB: BigInt(0) });
-  const hasPerformedInitialCheckRef = useRef(false);
 
   const semaphorePaymasterContractAddress = process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT as `0x${string}` | undefined;
-
-  // Effect to perform an initial group membership check
-  useEffect(() => {
-    if (!hasPerformedInitialCheckRef.current && (isMemberOfGroup === null || isMemberOfGroup === true)) {
-      console.log("[VotingComponent] Initial group check triggered by useEffect. Current isMemberOfGroup:", isMemberOfGroup);
-      checkGroupMembership();
-      hasPerformedInitialCheckRef.current = true;
-    }
-  }, [isMemberOfGroup, checkGroupMembership]);
 
   // Fetch current vote counts
   const fetchVoteCounts = useCallback(async () => {
@@ -140,18 +130,20 @@ export default function VotingComponent({
           You are not currently a member of the required group to participate in voting.
         </p>
         <p className="text-gray-400 text-sm mt-2 mb-4">
-          Please contact the group administrator or retry the check.
+          Please contact the group administrator to add you to the group, then click "Check Again" below.
         </p>
-        <Button 
-          label="Retry Group Check"
-          handleRegister={() => {
-            console.log("[VotingComponent] Manual retry group check triggered from FALSE state.");
-            checkGroupMembership();
-          }}
-          color="blue"
-          isLoading={isCheckingMembership}
-          disabled={isCheckingMembership}
-        />
+        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+          <Button 
+            label="Check Again"
+            handleRegister={() => {
+              console.log("[VotingComponent] Manual retry group check triggered from FALSE state.");
+              checkGroupMembership();
+            }}
+            color="blue"
+            isLoading={isCheckingMembership}
+            disabled={isCheckingMembership}
+          />
+        </div>
       </div>
     );
   }

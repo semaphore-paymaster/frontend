@@ -38,20 +38,56 @@ function Crystal({
   const floatTween = useRef<gsap.core.Tween | null>(null);
   const rotateTween = useRef<gsap.core.Tween | null>(null);
   const scaleTween = useRef<gsap.core.Tween | null>(null);
-  const currentTheme = themes[initialTheme];
+  const burstTween = useRef<gsap.core.Tween | null>(null);
+  
+  const [currentTheme, setCurrentTheme] = useState<ThemeKey>(initialTheme);
+  const theme = themes[currentTheme];
 
   const [stableInitialAttrs] = useState(() => ({
     rotation: Math.random() * 360,
     scale: 0.7 + Math.random() * 0.6, 
   }));
 
-  useEffect(() => {
+  const startFloatingAnimations = useCallback(() => {
     if (!crystalRef.current) return;
 
     // Kill any existing tweens
     if (floatTween.current) floatTween.current.kill();
     if (rotateTween.current) rotateTween.current.kill();
     if (scaleTween.current) scaleTween.current.kill();
+
+    // Floating animation
+    floatTween.current = gsap.to(crystalRef.current, {
+      y: "-=30",
+      duration: 2 + Math.random() * 2,
+      ease: "power1.inOut",
+      yoyo: true,
+      repeat: -1,
+      delay: 0, // No delay when restarting after click
+    });
+
+    // Rotation animation
+    rotateTween.current = gsap.to(crystalRef.current, {
+      rotation: "+=360",
+      duration: 8 + Math.random() * 4,
+      ease: "none",
+      repeat: -1,
+      delay: 0,
+    });
+
+    // Scale animation
+    scaleTween.current = gsap.to(crystalRef.current, {
+      scale: stableInitialAttrs.scale * 1.15,
+      duration: 3 + Math.random() * 2,
+      ease: "power2.inOut",
+      yoyo: true,
+      repeat: -1,
+      delay: 0,
+    });
+  }, [stableInitialAttrs]);
+
+  useEffect(() => {
+    if (!crystalRef.current) return;
 
     // Set initial state
     gsap.set(crystalRef.current, {
@@ -62,35 +98,10 @@ function Crystal({
       opacity: 0.7, 
     });
 
-    // Create separate tweens for each animation
-    // Floating animation
-    floatTween.current = gsap.to(crystalRef.current, {
-      y: "-=30",
-      duration: 2 + Math.random() * 2,
-      ease: "power1.inOut",
-      yoyo: true,
-      repeat: -1,
-      delay: delay,
-    });
-
-    // Rotation animation
-    rotateTween.current = gsap.to(crystalRef.current, {
-      rotation: "+=360",
-      duration: 8 + Math.random() * 4,
-      ease: "none",
-      repeat: -1,
-      delay: delay,
-    });
-
-    // Scale animation
-    scaleTween.current = gsap.to(crystalRef.current, {
-      scale: stableInitialAttrs.scale * 1.15,
-      duration: 3 + Math.random() * 2,
-      ease: "power2.inOut",
-      yoyo: true,
-      repeat: -1,
-      delay: delay,
-    });
+    // Start animations with initial delay
+    setTimeout(() => {
+      startFloatingAnimations();
+    }, delay * 1000);
 
     return () => {
       if (floatTween.current) {
@@ -105,18 +116,77 @@ function Crystal({
         scaleTween.current.kill();
         scaleTween.current = null;
       }
+      if (burstTween.current) {
+        burstTween.current.kill();
+        burstTween.current = null;
+      }
     };
-  }, [delay, stableInitialAttrs]);
+  }, [delay, stableInitialAttrs, startFloatingAnimations]);
+
+  const handleClick = () => {
+    if (!crystalRef.current) return;
+
+    // Toggle theme
+    const newTheme = currentTheme === 'blue' ? 'pink' : 'blue';
+    setCurrentTheme(newTheme);
+
+    // Kill existing animations
+    if (floatTween.current) floatTween.current.kill();
+    if (rotateTween.current) rotateTween.current.kill();
+    if (scaleTween.current) scaleTween.current.kill();
+    if (burstTween.current) burstTween.current.kill();
+
+    // Create burst effect - push in a random direction
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 50 + Math.random() * 100;
+    const targetX = Math.cos(angle) * distance;
+    const targetY = Math.sin(angle) * distance;
+
+    // Get current position
+    const currentX = gsap.getProperty(crystalRef.current, "x") as number;
+    const currentY = gsap.getProperty(crystalRef.current, "y") as number;
+
+    burstTween.current = gsap.to(crystalRef.current, {
+      x: currentX + targetX,
+      y: currentY + targetY,
+      rotation: `+=${(Math.random() - 0.5) * 720}`, // Spin during burst
+      scale: stableInitialAttrs.scale * 1.3, // Slightly enlarge during burst
+      duration: 0.6,
+      ease: "power2.out",
+      onComplete: () => {
+        // After burst, resume floating animations
+        startFloatingAnimations();
+      }
+    });
+
+    // Create sparkle effect (optional visual feedback)
+    createSparkleEffect();
+  };
+
+  const createSparkleEffect = () => {
+    // This is a placeholder for a sparkle effect
+    // You could emit particles here or trigger a visual effect
+    console.log('Sparkle effect triggered!');
+  };
 
   return (
     <div
       ref={crystalRef}
-      className={`absolute ${positionClasses} ${sizeClasses}`}
+      className={`absolute ${positionClasses} ${sizeClasses} cursor-pointer transition-colors duration-300`}
       style={{
-        background: currentTheme.gradient,
+        background: theme.gradient,
         clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-        filter: `drop-shadow(0 0 10px ${currentTheme.shadowColor})`,
+        filter: `drop-shadow(0 0 10px ${theme.shadowColor})`,
       }}
+      onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          handleClick();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label="Interactive crystal"
     />
   );
 }

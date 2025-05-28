@@ -4,8 +4,8 @@ import type React from "react";
 import type { SemaphoreProof } from "@semaphore-protocol/proof";
 import type { KernelAccountClient } from "@zerodev/sdk";
 import type { ENTRYPOINT_ADDRESS_V07 } from "permissionless";
-import AccountStatus from "./AccountStatus";
-import VotingComponent from "./VotingComponent";
+import AccountStatus from "../../components/status/AccountStatus";
+import VotingComponent from "../voting/VotingComponent";
 
 interface AccountDashboardProps {
   accountAddress: string;

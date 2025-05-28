@@ -4,14 +4,14 @@ import React, { useRef, useEffect } from "react";
 import type { SemaphoreProof } from "@semaphore-protocol/proof";
 import "react-toastify/dist/ReactToastify.css";
 
-import { GROUP_ID } from "../utils/constants";
+import { GROUP_ID } from "../../utils/constants";
 
-import Login from "./Login";
-import AddressAvatar from "./AddressAvatar";
+import Login from "../../components/auth/Login";
+import AddressAvatar from "../../components/ui/AddressAvatar";
 import AccountDashboard from "./AccountDashboard";
 
-import { useSmartAccount } from "../hooks/useSmartAccount";
-import { useSemaphore } from "../hooks/useSemaphore";
+import { useSmartAccount } from "../../hooks/useSmartAccount";
+import { useSemaphore } from "../../hooks/useSemaphore";
 
 interface AccountManagerProps {
   onVotingStateChange: (showAnimation: boolean) => void;

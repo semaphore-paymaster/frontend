@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { ReactNode, FC } from "react";
-import { publicClient } from "../config/viem";
-import AddressAvatar from "./AddressAvatar";
-import RefreshIcon from "./icons/RefreshIcon";
+import { publicClient } from "../../config/viem";
+import AddressAvatar from "../ui/AddressAvatar";
+import RefreshIcon from "../ui/icons/RefreshIcon";
 
 // Helper component for individual dashboard lights
 const DashboardLight: FC<{

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import BlockiesSvg from "blockies-react-svg";
-import truncateEthAddress from "../utils/truncateAddress";
+import truncateEthAddress from "../../utils/truncateAddress";
 import CopyIcon from "./icons/CopyIcon"; // Import the new icon
 
 interface AddressAvatarProps {
