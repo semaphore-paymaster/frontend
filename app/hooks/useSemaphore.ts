@@ -135,9 +135,9 @@ export const useSemaphore = ({
       setIsMemberOfGroup(isMember);
       
       if (isMember) {
-        toast.success(`✅ You are a member of group ${groupId}!`);
+        toast.success(`You are a member of group ${groupId}!`);
       } else {
-        toast.info(`❌ You are not currently a member of group ${groupId}.`);
+        toast.info(`You are not currently a member of group ${groupId}.`);
         console.log("[useSemaphore] To add this address to the group, use:");
         console.log(`addMember(${groupId}, ${identityCommitment.toString()})`);
       }

@@ -38,10 +38,15 @@ export default function AccountManager({ onVotingStateChange }: AccountManagerPr
   } = useSemaphore({
     accountAddress,
     groupId: GROUP_ID, 
-    semaphorePaymasterAddress: (process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT || "0x") as `0x${string}`, 
+    semaphorePaymasterAddress: process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT as `0x${string}` || "", 
   });
 
   useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT) {
+      console.error("[AccountManager] NEXT_PUBLIC_PAYMASTER_CONTRACT environment variable is not set!");
+      return;
+    }
+    
     if (isKernelClientReady && accountAddress && isMemberOfGroup === null) {
       console.log("[AccountManager] Checking group membership, triggered by useEffect.");
       checkGroupMembership();

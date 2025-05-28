@@ -46,6 +46,8 @@ export default function VotingComponent({
 
   const semaphorePaymasterContractAddress = process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT as `0x${string}` | undefined;
 
+  console.log("[VotingComponent] Paymaster contract address:", semaphorePaymasterContractAddress);
+
   const fetchVoteCounts = useCallback(async () => {
     try {
       const [votesA, votesB] = await Promise.all([
@@ -92,6 +94,11 @@ export default function VotingComponent({
 
   if (isMemberOfGroup === null) {
     console.log("[VotingComponent Render] Showing: Retry Button section (isMemberOfGroup is null, isCheckingMembership is false)");
+    console.log("[VotingComponent] Membership check failed or returned null. This could be due to:");
+    console.log("1. Invalid paymaster contract address");
+    console.log("2. Network/RPC issues");
+    console.log("3. Group doesn't exist");
+    console.log("4. Contract call failed");
     return (
       <div className="py-8 px-4 text-center">
         <p className="text-gray-400">
@@ -116,6 +123,9 @@ export default function VotingComponent({
 
   if (isMemberOfGroup === false) {
     console.log("[VotingComponent Render] Showing: Access Restricted (isMemberOfGroup is false)");
+    const identity = new Identity(accountAddress);
+    const commitmentStr = identity.commitment.toString();
+    
     return (
       <div className="py-8 px-4 text-center bg-gray-700/20 rounded-lg shadow-md">
         <h3 className="text-xl font-semibold text-yellow-400 mb-3">Access Restricted</h3>
@@ -125,7 +135,8 @@ export default function VotingComponent({
         <p className="text-gray-400 text-sm mt-2 mb-4">
           Please contact the group administrator to add you to the group, then click &quot;Check Again&quot; below.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+        
+        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mt-4">
           <Button 
             label="Check Again"
             handleRegister={() => {
@@ -184,18 +195,7 @@ export default function VotingComponent({
       
       const identity = new Identity(accountAddress);
       
-      const isMember = await publicClient.readContract({
-        address: semaphorePaymasterContractAddress,
-        abi: SEMAPHORE_PAYMASTER_ABI,
-        functionName: 'hasMember',
-        args: [BigInt(GROUP_ID), identity.commitment],
-      }) as boolean;
-
-      if (!isMember) {
-        throw new Error("You are not a member of this group. Please ensure you have been added to the group before voting.");
-      }
-
-      console.log("[VotingComponent] Identity verified as group member");
+      console.log("[VotingComponent] User is already verified as group member");
 
       console.log("[VotingComponent] Fetching group members from events...");
       
