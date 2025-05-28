@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { encodeFunctionData } from "viem";
-import { bundlerActions, ENTRYPOINT_ADDRESS_V07, type BundlerActions } from 'permissionless';
+import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from 'permissionless';
 import { toast } from 'react-toastify';
 import { publicClient } from "../../config/viem";
 import { Identity } from "@semaphore-protocol/identity";

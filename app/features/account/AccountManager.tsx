@@ -7,7 +7,6 @@ import "react-toastify/dist/ReactToastify.css";
 import { GROUP_ID } from "../../utils/constants";
 
 import Login from "../../components/auth/Login";
-import AddressAvatar from "../../components/ui/AddressAvatar";
 import AccountDashboard from "./AccountDashboard";
 
 import { useSmartAccount } from "../../hooks/useSmartAccount";
@@ -54,9 +53,6 @@ export default function AccountManager({ onVotingStateChange }: AccountManagerPr
   }, [isKernelClientReady, accountAddress, isMemberOfGroup, checkGroupMembership]);
 
   useEffect(() => {
-    // If accountAddress is present, user is logged in and sees the dashboard.
-    // In this case, we want to hide the animation.
-    // So, showCrystalAnimation should be true only if there's NO accountAddress.
     const showAnimation = !accountAddress;
     onVotingStateChange(showAnimation);
   }, [accountAddress, onVotingStateChange]);
