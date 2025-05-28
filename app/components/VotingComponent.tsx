@@ -1,28 +1,31 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { encodeFunctionData, encodeAbiParameters } from "viem";
-import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from 'permissionless';
+import { useState, useRef, useCallback, useEffect } from "react";
+import { encodeFunctionData } from "viem";
+import { bundlerActions, ENTRYPOINT_ADDRESS_V07, type BundlerActions } from 'permissionless';
 import { toast } from 'react-toastify';
 import { publicClient } from "../config/viem";
 import { Identity } from "@semaphore-protocol/identity";
 import { Group } from "@semaphore-protocol/group";
 import { generateProof } from "@semaphore-protocol/proof";
 import type { SemaphoreProof } from "@semaphore-protocol/proof";
+import type { KernelAccountClient } from '@zerodev/sdk';
 
 import { GROUP_ID } from "../utils/constants";
 import { SEMAPHORE_PAYMASTER_ABI } from "../config/semaphore";
 import { VOTING_CONTRACT_ABI, VOTING_CONTRACT_ADDRESS, VOTE_CHOICES } from "../config/voting";
 
 import Button from "./Button";
-import VotingOptions from "./VotingOptions";
 
 interface VotingComponentProps {
   accountAddress: string;
-  kernelClientRef: React.MutableRefObject<any>;
+  kernelClientRef: React.MutableRefObject<KernelAccountClient<typeof ENTRYPOINT_ADDRESS_V07> | null>;
   semaphoreProofRef: React.MutableRefObject<SemaphoreProof | null>;
   isMemberOfGroup: boolean | null;
   isKernelClientReady: boolean;
+  handleLogout: () => void;
+  isCheckingMembership: boolean;
+  checkGroupMembership: () => void;
 }
 
 export default function VotingComponent({
@@ -30,7 +33,10 @@ export default function VotingComponent({
   kernelClientRef,
   semaphoreProofRef,
   isMemberOfGroup,
-  isKernelClientReady
+  isKernelClientReady,
+  handleLogout,
+  isCheckingMembership,
+  checkGroupMembership
 }: VotingComponentProps) {
   // Voting state
   const [isVoting, setIsVoting] = useState(false);
@@ -38,8 +44,18 @@ export default function VotingComponent({
   const [isFirstOptionSelected, setIsFirstOptionSelected] = useState(true);
   const [votingPercentage, setVotingPercentage] = useState(5);
   const [voteCounts, setVoteCounts] = useState({ votesA: BigInt(0), votesB: BigInt(0) });
+  const hasPerformedInitialCheckRef = useRef(false);
 
   const semaphorePaymasterContractAddress = process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT as `0x${string}` | undefined;
+
+  // Effect to perform an initial group membership check
+  useEffect(() => {
+    if (!hasPerformedInitialCheckRef.current && (isMemberOfGroup === null || isMemberOfGroup === true)) {
+      console.log("[VotingComponent] Initial group check triggered by useEffect. Current isMemberOfGroup:", isMemberOfGroup);
+      checkGroupMembership();
+      hasPerformedInitialCheckRef.current = true;
+    }
+  }, [isMemberOfGroup, checkGroupMembership]);
 
   // Fetch current vote counts
   const fetchVoteCounts = useCallback(async () => {
@@ -66,8 +82,98 @@ export default function VotingComponent({
 
   // Fetch vote counts when component loads
   useEffect(() => {
-    fetchVoteCounts();
-  }, [fetchVoteCounts]);
+    // Only fetch if the user is a member, otherwise, the voting UI isn't shown anyway
+    if (isMemberOfGroup === true) {
+      fetchVoteCounts();
+    }
+  }, [fetchVoteCounts, isMemberOfGroup]);
+
+  console.log("[VotingComponent Render] isCheckingMembership:", isCheckingMembership, "isMemberOfGroup:", isMemberOfGroup);
+
+  // Display loading indicator if checking membership
+  if (isCheckingMembership) {
+    console.log("[VotingComponent Render] Showing: Verifying (isCheckingMembership is true)");
+    return (
+      <div className="py-8 px-4 text-center">
+        <p className="text-gray-400">
+          Verifying group membership status...
+        </p>
+        <p className="text-gray-500 text-sm mt-2">
+          Please wait...
+        </p>
+      </div>
+    );
+  }
+
+  // If still null after checking (and not currently checking)
+  if (isMemberOfGroup === null) {
+    console.log("[VotingComponent Render] Showing: Retry Button section (isMemberOfGroup is null, isCheckingMembership is false)");
+    return (
+      <div className="py-8 px-4 text-center">
+        <p className="text-gray-400">
+          Could not determine group membership.
+        </p>
+        <p className="text-gray-500 text-sm mt-2 mb-4">
+          Please wait, or try refreshing via the status light above, or click below.
+        </p>
+        <Button 
+          label="Retry Group Check"
+          handleRegister={() => {
+            console.log("[VotingComponent] Manual retry group check triggered from NULL state.");
+            checkGroupMembership();
+          }}
+          color="blue"
+          isLoading={isCheckingMembership}
+          disabled={isCheckingMembership}
+        />
+      </div>
+    );
+  }
+
+  // If not a member
+  if (isMemberOfGroup === false) {
+    console.log("[VotingComponent Render] Showing: Access Restricted (isMemberOfGroup is false)");
+    return (
+      <div className="py-8 px-4 text-center bg-gray-700/20 rounded-lg shadow-md">
+        <h3 className="text-xl font-semibold text-yellow-400 mb-3">Access Restricted</h3>
+        <p className="text-gray-300">
+          You are not currently a member of the required group to participate in voting.
+        </p>
+        <p className="text-gray-400 text-sm mt-2 mb-4">
+          Please contact the group administrator or retry the check.
+        </p>
+        <Button 
+          label="Retry Group Check"
+          handleRegister={() => {
+            console.log("[VotingComponent] Manual retry group check triggered from FALSE state.");
+            checkGroupMembership();
+          }}
+          color="blue"
+          isLoading={isCheckingMembership}
+          disabled={isCheckingMembership}
+        />
+      </div>
+    );
+  }
+
+  // If member, proceed to render voting UI or results
+  console.log("[VotingComponent Render] Showing: Voting UI (isMemberOfGroup is true)");
+  // Helper function to render vote counts
+  const renderVoteCountsDisplay = (currentVoteCounts: { votesA: bigint, votesB: bigint }) => (
+    <div className="text-center space-y-2 my-4">
+      <div className="text-sm text-gray-400 font-medium">Current Results</div>
+      <div className="flex justify-center space-x-6">
+        <div className="flex flex-col items-center">
+          <div className="text-lg font-bold text-blue-400">Option A</div>
+          <div className="text-2xl font-bold text-white">{currentVoteCounts.votesA.toString()}</div>
+        </div>
+        <div className="flex flex-col items-center">
+          <div className="text-lg font-bold text-purple-400">Option B</div>
+          <div className="text-2xl font-bold text-white">{currentVoteCounts.votesB.toString()}</div>
+        </div>
+      </div>
+    </div>
+  );
 
   // Submit vote function
   const submitVote = async () => {
@@ -79,6 +185,13 @@ export default function VotingComponent({
     const kernelClient = kernelClientRef.current;
     setIsVoting(true);
     setVotingPercentage(10);
+
+    // Ensure kernelClient and its account are defined before proceeding
+    if (!kernelClient || !kernelClient.account) {
+      toast.error("Kernel client or account is not available.");
+      setIsVoting(false);
+      return;
+    }
 
     try {
       console.log("[VotingComponent] Starting vote submission for choice:", isFirstOptionSelected ? 'A' : 'B');
@@ -276,7 +389,7 @@ export default function VotingComponent({
       // Wait for transaction confirmation using kernel client
       setVotingPercentage(80);
       
-      const bundlerClient = kernelClient.extend(bundlerActions(ENTRYPOINT_ADDRESS_V07)) as any;
+      const bundlerClient = kernelClient.extend(bundlerActions(ENTRYPOINT_ADDRESS_V07)) as KernelAccountClient<typeof ENTRYPOINT_ADDRESS_V07> & BundlerActions<typeof ENTRYPOINT_ADDRESS_V07>;
       const receipt = await bundlerClient.waitForUserOperationReceipt({ 
         hash: userOpHash,
         timeout: 60000,
@@ -312,45 +425,55 @@ export default function VotingComponent({
     }
   };
 
-  if (!isMemberOfGroup) {
-    return null; // Don't render if not a member
-  }
+  const optionButtonBaseClasses = "w-full sm:w-auto flex-1 text-xl sm:text-2xl font-semibold py-6 sm:py-8 px-6 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:ring-4 hover:shadow-lg";
+  const optionAClasses = isFirstOptionSelected 
+    ? "bg-blue-500/20 border-blue-500 text-blue-300 focus:ring-blue-500/50 shadow-blue-500/30 shadow-md"
+    : "bg-gray-700/30 border-gray-600 hover:border-blue-500/70 text-gray-400 hover:text-blue-400 focus:ring-blue-500/30";
+  const optionBClasses = !isFirstOptionSelected
+    ? "bg-purple-500/20 border-purple-500 text-purple-300 focus:ring-purple-500/50 shadow-purple-500/30 shadow-md"
+    : "bg-gray-700/30 border-gray-600 hover:border-purple-500/70 text-gray-400 hover:text-purple-400 focus:ring-purple-500/30";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 py-4">
       {!userHasVoted && (
-        <div className="space-y-4">
-          {/* Current vote counts display */}
-          <div className="text-center space-y-2">
-            <div className="text-sm text-gray-400 font-medium">Current Results</div>
-            <div className="flex justify-center space-x-6">
-              <div className="flex flex-col items-center">
-                <div className="text-lg font-bold text-blue-400">Option A</div>
-                <div className="text-2xl font-bold text-white">{voteCounts.votesA.toString()}</div>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="text-lg font-bold text-purple-400">Option B</div>
-                <div className="text-2xl font-bold text-white">{voteCounts.votesB.toString()}</div>
-              </div>
-            </div>
+        <div className="space-y-8">
+          {/* Current vote counts display should be removed here if not already */}
+          {/* {renderVoteCountsDisplay(voteCounts)} */}
+          
+          {/* Big Option Buttons */}
+          <div className="flex flex-col sm:flex-row items-stretch justify-center gap-4 sm:gap-6 px-2 sm:px-0">
+            <button
+              type="button"
+              onClick={() => setIsFirstOptionSelected(true)}
+              className={`${optionButtonBaseClasses} ${optionAClasses}`}
+            >
+              Vote for Option A
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsFirstOptionSelected(false)}
+              className={`${optionButtonBaseClasses} ${optionBClasses}`}
+            >
+              Vote for Option B
+            </button>
           </div>
           
-          <VotingOptions
-            setIsFirstOptionSelected={setIsFirstOptionSelected}
-            isFirstOptionSelected={isFirstOptionSelected}
-          />
-          <Button
-            label="Vote"
-            isLoading={isVoting}
-            disabled={!isKernelClientReady || isVoting}
-            handleRegister={submitVote}
-            color="pink"
-          />
+          {/* Centered Vote Button */}
+          <div className="flex justify-center pt-4">
+            <Button
+              label="Cast Your Vote"
+              isLoading={isVoting}
+              disabled={!isKernelClientReady || isVoting}
+              handleRegister={submitVote}
+              color="pink" // Assuming Button component can take a size prop or this color implies a large size
+            />
+          </div>
+
           {isVoting && (
-            <div className="mt-3">
-              <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+            <div className="mt-4">
+              <div className="h-2.5 w-full bg-gray-700 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-300" 
+                  className="h-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 transition-all duration-300"
                   style={{width: `${votingPercentage}%`}} 
                 />
               </div>
@@ -360,10 +483,12 @@ export default function VotingComponent({
       )}
 
       {userHasVoted && (
-        <div className="text-center">
-          <div className="inline-flex items-center px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-full">
-            <span className="text-green-400 font-medium">✓ Thanks for your vote!</span>
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center px-4 py-2 bg-green-600/30 border border-green-500/50 rounded-full">
+            <span className="text-green-300 font-medium">✓ Thanks for your vote!</span>
           </div>
+          {/* Display results after voting */}
+          {renderVoteCountsDisplay(voteCounts)}
         </div>
       )}
     </div>

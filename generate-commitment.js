@@ -104,6 +104,9 @@ async function main() {
     console.log('📋 FOR BLOCKCHAIN EXPLORER (addMember):');
     console.log(`groupId: ${groupId}`);
     console.log(`identityCommitment: ${identity.identityCommitment}`);
+    console.log('');
+    console.log('🔗 Go to this link and add the new member:');
+    console.log('   https://sepolia.basescan.org/address/0xcedcff6462f323c1a1353698de944b0f04c6e8c4#readContract');
     
   } catch (error) {
     console.error('❌ Error:', error.message);

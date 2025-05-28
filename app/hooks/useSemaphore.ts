@@ -65,7 +65,7 @@ export const useSemaphore = ({
       if (isMember) {
         toast.success(`✅ You are a member of group ${groupId}!`);
       } else {
-        toast.info(`Group ${groupId} has ${groupSize.toString()} members. You are not currently a member.`);
+        toast.info(`You are not currently a member of group ${groupId}.`);
       }
       
     } catch (error) {

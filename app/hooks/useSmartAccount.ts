@@ -365,6 +365,30 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
     }
   }, [username, createAccountAndClient]);
 
+  const handleLogout = useCallback(() => {
+    console.log("[handleLogout] Logging out user...");
+    
+    // Clear all refs
+    sessionKeyAccountRef.current = null;
+    kernelClientRef.current = null;
+    bundlerClientRef.current = null;
+    passkeyValidatorRef.current = null;
+    semaphoreKernelClientRef.current = null;
+    
+    // Reset state
+    setAccountAddress("");
+    setIsKernelClientReady(false);
+    setIsRegistering(false);
+    setIsLoggingIn(false);
+    
+    // Clear the semaphore proof ref if it exists
+    if (semaphoreProofRef.current) {
+      semaphoreProofRef.current = null;
+    }
+    
+    console.log("[handleLogout] Logout complete");
+  }, [semaphoreProofRef]);
+
   return {
     accountAddress,
     isKernelClientReady,
@@ -374,6 +398,7 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
     setUsername,
     handleRegister,
     handleLogin,
+    handleLogout,
     kernelClientRef,
     sessionKeyAccountRef,
     bundlerClientRef,

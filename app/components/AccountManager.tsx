@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
 import type { SemaphoreProof } from "@semaphore-protocol/proof";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -8,19 +8,18 @@ import { GROUP_ID } from "../utils/constants";
 
 import Login from "./Login";
 import AddressAvatar from "./AddressAvatar";
-import AccountStatus from "./AccountStatus";
-import VotingComponent from "./VotingComponent";
+import AccountDashboard from "./AccountDashboard";
 
 import { useSmartAccount } from "../hooks/useSmartAccount";
 import { useSemaphore } from "../hooks/useSemaphore";
 
+interface AccountManagerProps {
+  onVotingStateChange: (showAnimation: boolean) => void;
+}
 
-export default function AccountCreationForm() {
+export default function AccountManager({ onVotingStateChange }: AccountManagerProps) {
   const semaphoreProofRef = useRef<SemaphoreProof | null>(null); 
 
-
-
-  // 2. Call custom hooks
   const {
     accountAddress,
     isKernelClientReady,
@@ -28,11 +27,9 @@ export default function AccountCreationForm() {
     isLoggingIn,
     handleRegister,
     handleLogin,
+    handleLogout,
     kernelClientRef,
   } = useSmartAccount(semaphoreProofRef);
-
-
-
 
   const {
     isCheckingMembership,
@@ -41,20 +38,23 @@ export default function AccountCreationForm() {
   } = useSemaphore({
     accountAddress,
     groupId: GROUP_ID, 
-    semaphorePaymasterAddress: process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT || "0x", 
+    semaphorePaymasterAddress: (process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT || "0x") as `0x${string}`, 
   });
 
-
-  // Check group membership when account is ready
   useEffect(() => {
     if (isKernelClientReady && accountAddress && isMemberOfGroup === null) {
-      console.log("[AccountCreationForm] Checking group membership");
+      console.log("[AccountManager] Checking group membership, triggered by useEffect.");
       checkGroupMembership();
     }
   }, [isKernelClientReady, accountAddress, isMemberOfGroup, checkGroupMembership]);
 
-
-
+  useEffect(() => {
+    // If accountAddress is present, user is logged in and sees the dashboard.
+    // In this case, we want to hide the animation.
+    // So, showCrystalAnimation should be true only if there's NO accountAddress.
+    const showAnimation = !accountAddress;
+    onVotingStateChange(showAnimation);
+  }, [accountAddress, onVotingStateChange]);
 
   return (
     <div className="space-y-6">
@@ -70,31 +70,18 @@ export default function AccountCreationForm() {
           </div>
         )}
 
-        <div className="space-y-4">
-          {accountAddress && (
-            <div className="text-center">
-              <AddressAvatar accountAddress={accountAddress} />
-            </div>
-          )}
+        <div className="space-y-4 ">
 
-          {/* Account Status Component */}
           {accountAddress && (
-            <AccountStatus
+            <AccountDashboard
               accountAddress={accountAddress}
               isMemberOfGroup={isMemberOfGroup}
               isCheckingMembership={isCheckingMembership}
               checkGroupMembership={checkGroupMembership}
-            />
-          )}
-
-          {/* Voting Component */}
-          {accountAddress && isMemberOfGroup === true && (
-            <VotingComponent
-              accountAddress={accountAddress}
               kernelClientRef={kernelClientRef}
               semaphoreProofRef={semaphoreProofRef}
-              isMemberOfGroup={isMemberOfGroup}
               isKernelClientReady={isKernelClientReady}
+              handleLogout={handleLogout}
             />
           )}
         </div>
