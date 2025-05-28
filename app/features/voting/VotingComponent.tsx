@@ -38,7 +38,6 @@ export default function VotingComponent({
   isCheckingMembership,
   checkGroupMembership
 }: VotingComponentProps) {
-  // Voting state
   const [isVoting, setIsVoting] = useState(false);
   const [userHasVoted, setUserHasVoted] = useState(false);
   const [isFirstOptionSelected, setIsFirstOptionSelected] = useState(true);
@@ -47,7 +46,6 @@ export default function VotingComponent({
 
   const semaphorePaymasterContractAddress = process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT as `0x${string}` | undefined;
 
-  // Fetch current vote counts
   const fetchVoteCounts = useCallback(async () => {
     try {
       const [votesA, votesB] = await Promise.all([
@@ -70,9 +68,7 @@ export default function VotingComponent({
     }
   }, []);
 
-  // Fetch vote counts when component loads
   useEffect(() => {
-    // Only fetch if the user is a member, otherwise, the voting UI isn't shown anyway
     if (isMemberOfGroup === true) {
       fetchVoteCounts();
     }
@@ -80,7 +76,6 @@ export default function VotingComponent({
 
   console.log("[VotingComponent Render] isCheckingMembership:", isCheckingMembership, "isMemberOfGroup:", isMemberOfGroup);
 
-  // Display loading indicator if checking membership
   if (isCheckingMembership) {
     console.log("[VotingComponent Render] Showing: Verifying (isCheckingMembership is true)");
     return (
@@ -95,7 +90,6 @@ export default function VotingComponent({
     );
   }
 
-  // If still null after checking (and not currently checking)
   if (isMemberOfGroup === null) {
     console.log("[VotingComponent Render] Showing: Retry Button section (isMemberOfGroup is null, isCheckingMembership is false)");
     return (
@@ -120,7 +114,6 @@ export default function VotingComponent({
     );
   }
 
-  // If not a member
   if (isMemberOfGroup === false) {
     console.log("[VotingComponent Render] Showing: Access Restricted (isMemberOfGroup is false)");
     return (
@@ -130,7 +123,7 @@ export default function VotingComponent({
           You are not currently a member of the required group to participate in voting.
         </p>
         <p className="text-gray-400 text-sm mt-2 mb-4">
-          Please contact the group administrator to add you to the group, then click "Check Again" below.
+          Please contact the group administrator to add you to the group, then click &quot;Check Again&quot; below.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
           <Button 
@@ -148,9 +141,7 @@ export default function VotingComponent({
     );
   }
 
-  // If member, proceed to render voting UI or results
   console.log("[VotingComponent Render] Showing: Voting UI (isMemberOfGroup is true)");
-  // Helper function to render vote counts
   const renderVoteCountsDisplay = (currentVoteCounts: { votesA: bigint, votesB: bigint }) => (
     <div className="text-center space-y-2 my-4">
       <div className="text-sm text-gray-400 font-medium">Current Results</div>
@@ -167,7 +158,6 @@ export default function VotingComponent({
     </div>
   );
 
-  // Submit vote function
   const submitVote = async () => {
     if (!kernelClientRef.current || !accountAddress || !semaphorePaymasterContractAddress) {
       toast.error("Wallet not connected or paymaster not configured");
@@ -178,7 +168,6 @@ export default function VotingComponent({
     setIsVoting(true);
     setVotingPercentage(10);
 
-    // Ensure kernelClient and its account are defined before proceeding
     if (!kernelClient || !kernelClient.account) {
       toast.error("Kernel client or account is not available.");
       setIsVoting(false);
@@ -188,17 +177,13 @@ export default function VotingComponent({
     try {
       console.log("[VotingComponent] Starting vote submission for choice:", isFirstOptionSelected ? 'A' : 'B');
       
-      // Determine vote choice (A = 0, B = 1)
       const choice = isFirstOptionSelected ? VOTE_CHOICES.A : VOTE_CHOICES.B;
       
-      // Generate Semaphore proof for voting
       setVotingPercentage(20);
       console.log("[VotingComponent] Generating Semaphore proof for voting...");
       
-      // Create identity from account address (same as in useSemaphore)
       const identity = new Identity(accountAddress);
       
-      // First, verify membership using the same method as useSemaphore hook
       const isMember = await publicClient.readContract({
         address: semaphorePaymasterContractAddress,
         abi: SEMAPHORE_PAYMASTER_ABI,
@@ -212,7 +197,6 @@ export default function VotingComponent({
 
       console.log("[VotingComponent] Identity verified as group member");
 
-      // Get group members by listening to MemberAdded events
       console.log("[VotingComponent] Fetching group members from events...");
       
       const memberAddedEvents = await publicClient.getLogs({
@@ -236,7 +220,6 @@ export default function VotingComponent({
       
       console.log("[VotingComponent] Found", memberAddedEvents.length, "member events");
       
-      // Extract identity commitments and sort by index
       const members = memberAddedEvents
         .map(event => ({
           index: Number(event.args.index),
@@ -247,21 +230,16 @@ export default function VotingComponent({
       
       console.log("[VotingComponent] Group members:", members.map(m => m.toString()));
       
-      // Create group with actual on-chain members (same as in tests)
       const group = new Group(members);
       
-      // Generate message (account address as BigInt)
       const message = BigInt(accountAddress);
       
-      // Generate the Semaphore proof against the actual on-chain group
       const proof = await generateProof(identity, group, message, Number(GROUP_ID));
       
       console.log("[VotingComponent] Generated Semaphore proof:", proof);
       
-      // Set the proof in the ref so the middleware can detect it
       semaphoreProofRef.current = proof;
       
-      // Let's verify the proof locally before sending it
       try {
         const isValidProof = await publicClient.readContract({
           address: semaphorePaymasterContractAddress,
@@ -288,7 +266,6 @@ export default function VotingComponent({
         console.error("[VotingComponent] Error verifying proof locally:", error);
       }
       
-      // Check group balance in paymaster
       const groupBalance = await publicClient.readContract({
         address: semaphorePaymasterContractAddress,
         abi: SEMAPHORE_PAYMASTER_ABI,
@@ -296,7 +273,6 @@ export default function VotingComponent({
         args: [BigInt(GROUP_ID)],
       }) as bigint;
       
-      // Check paymaster balance in EntryPoint
       const paymasterBalance = await publicClient.readContract({
         address: semaphorePaymasterContractAddress,
         abi: SEMAPHORE_PAYMASTER_ABI,
@@ -308,22 +284,18 @@ export default function VotingComponent({
       console.log("[VotingComponent] Paymaster balance in EntryPoint:", paymasterBalance.toString(), "wei");
       console.log("[VotingComponent] Paymaster balance in ETH:", (Number(paymasterBalance) / 1e18).toFixed(4), "ETH");
       
-      // Check if paymaster has sufficient funds for this transaction
-      const estimatedGasCost = BigInt(1200000) * BigInt(200000000000); // ~1.2M gas * 200 gwei = rough estimate
+      const estimatedGasCost = BigInt(1200000) * BigInt(200000000000);
       console.log("[VotingComponent] Estimated transaction cost:", estimatedGasCost.toString(), "wei");
       console.log("[VotingComponent] Estimated cost in ETH:", (Number(estimatedGasCost) / 1e18).toFixed(4), "ETH");
       
-      // Check if group has sufficient funds
       if (groupBalance === BigInt(0)) {
         throw new Error(`Group ${GROUP_ID} has no funds deposited in the paymaster. Please deposit funds using the depositForGroup function first.`);
       }
       
-      // Warn if paymaster balance might be too low for transaction
       if (paymasterBalance < estimatedGasCost) {
         console.warn(`[VotingComponent] WARNING: Paymaster balance (${(Number(paymasterBalance) / 1e18).toFixed(4)} ETH) might be insufficient for estimated cost (${(Number(estimatedGasCost) / 1e18).toFixed(4)} ETH)`);
       }
       
-      // Check EntryPoint balance directly (more accurate)
       try {
         const entryPointBalance = await publicClient.readContract({
           address: ENTRYPOINT_ADDRESS_V07,
@@ -350,7 +322,6 @@ export default function VotingComponent({
         console.error("[VotingComponent] Error checking EntryPoint balance:", error);
       }
       
-      // Encode the vote function call
       setVotingPercentage(40);
       const callData = encodeFunctionData({
         abi: VOTING_CONTRACT_ABI,
@@ -360,14 +331,12 @@ export default function VotingComponent({
 
       console.log("[VotingComponent] Encoded call data:", callData);
 
-      // Send transaction with Semaphore paymaster
       setVotingPercentage(60);
       
       console.log("[VotingComponent] Sending vote transaction with Semaphore paymaster...");
       
-      // Send the transaction using kernel client (middleware will handle Semaphore paymaster)
       const userOpHash = await kernelClient.sendUserOperation({
-        account: kernelClient.account,
+        account: kernelClient.account as any,
         userOperation: {
           callData: await kernelClient.account.encodeCallData({
             to: VOTING_CONTRACT_ADDRESS,
@@ -378,10 +347,9 @@ export default function VotingComponent({
       });
       console.log("[VotingComponent] User operation hash:", userOpHash);
       
-      // Wait for transaction confirmation using kernel client
       setVotingPercentage(80);
       
-      const bundlerClient = kernelClient.extend(bundlerActions(ENTRYPOINT_ADDRESS_V07)) as KernelAccountClient<typeof ENTRYPOINT_ADDRESS_V07> & BundlerActions<typeof ENTRYPOINT_ADDRESS_V07>;
+      const bundlerClient = kernelClient.extend((bundlerActions as any)(ENTRYPOINT_ADDRESS_V07)) as any;
       const receipt = await bundlerClient.waitForUserOperationReceipt({ 
         hash: userOpHash,
         timeout: 60000,
@@ -394,12 +362,11 @@ export default function VotingComponent({
       if (receipt.success) {
         console.log("[VotingComponent] Vote successful:", receipt);
         setUserHasVoted(true);
-        await fetchVoteCounts(); // Refresh vote counts
+        await fetchVoteCounts();
         
         const choiceName = isFirstOptionSelected ? 'A' : 'B';
         toast.success(`✅ Vote for option ${choiceName} submitted successfully!`);
         
-        // Build success message with transaction link
         const explorerUrl = `https://sepolia.basescan.org/tx/${receipt.receipt.transactionHash}`;
         toast.success(`Vote confirmed on blockchain! View at: ${explorerUrl}`);
       } else {
@@ -410,7 +377,6 @@ export default function VotingComponent({
       console.error("[VotingComponent] Error submitting vote:", error);
       toast.error(`Failed to submit vote: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      // Clear the semaphore proof ref
       semaphoreProofRef.current = null;
       setIsVoting(false);
       setVotingPercentage(0);
@@ -429,10 +395,8 @@ export default function VotingComponent({
     <div className="space-y-6 py-4">
       {!userHasVoted && (
         <div className="space-y-8">
-          {/* Current vote counts display should be removed here if not already */}
-          {/* {renderVoteCountsDisplay(voteCounts)} */}
           
-          {/* Big Option Buttons */}
+          
           <div className="flex flex-col sm:flex-row items-stretch justify-center gap-4 sm:gap-6 px-2 sm:px-0">
             <button
               type="button"
@@ -450,14 +414,14 @@ export default function VotingComponent({
             </button>
           </div>
           
-          {/* Centered Vote Button */}
+          
           <div className="flex justify-center pt-4">
             <Button
               label="Cast Your Vote"
               isLoading={isVoting}
               disabled={!isKernelClientReady || isVoting}
               handleRegister={submitVote}
-              color="pink" // Assuming Button component can take a size prop or this color implies a large size
+              color="pink"
             />
           </div>
 
@@ -479,7 +443,7 @@ export default function VotingComponent({
           <div className="inline-flex items-center px-4 py-2 bg-green-600/30 border border-green-500/50 rounded-full">
             <span className="text-green-300 font-medium">✓ Thanks for your vote!</span>
           </div>
-          {/* Display results after voting */}
+          
           {renderVoteCountsDisplay(voteCounts)}
         </div>
       )}

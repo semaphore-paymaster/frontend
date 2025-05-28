@@ -55,14 +55,12 @@ export const useZeroDevClient = () => {
       },
     });
 
-    // Create ZeroDev paymaster client
     const zeroDevPaymaster = createZeroDevPaymasterClient({
       chain: CHAIN,
       transport: http(PAYMASTER_URL),
       entryPoint: ENTRYPOINT_ADDRESS_V07,
     });
 
-    // Simple kernel client with ZeroDev paymaster sponsorship
     zeroDevKernelClientRef.current = createKernelAccountClient({
       account: zeroDevSessionKeyAccountRef.current,
       chain: CHAIN,

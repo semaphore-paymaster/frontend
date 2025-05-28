@@ -4,10 +4,7 @@ import {
   createKernelAccountClient,
   createZeroDevPaymasterClient,
 } from "@zerodev/sdk";
-import type {
-  KernelSmartAccount,
-  KernelAccountClient,
-} from "@zerodev/sdk";
+
 import {
   WebAuthnMode,
   toPasskeyValidator,
@@ -20,7 +17,6 @@ import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
 import {
   bundlerActions,
   ENTRYPOINT_ADDRESS_V07,
-  type BundlerActions,
   type EstimateUserOperationGasParameters,
 } from "permissionless";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
@@ -381,13 +377,10 @@ export const useSmartAccount = (semaphoreProofRef: React.RefObject<SemaphoreProo
     setIsRegistering(false);
     setIsLoggingIn(false);
     
-    // Clear the semaphore proof ref if it exists
-    if (semaphoreProofRef.current) {
-      semaphoreProofRef.current = null;
-    }
+    // Note: semaphoreProofRef will be cleared by the parent component
     
     console.log("[handleLogout] Logout complete");
-  }, [semaphoreProofRef]);
+  }, []);
 
   return {
     accountAddress,

@@ -1,9 +1,9 @@
-"use client"; // Required for useState and onClick handlers
+"use client";
 
 import { useState } from 'react';
 import BlockiesSvg from "blockies-react-svg";
 import truncateEthAddress from "../../utils/truncateAddress";
-import CopyIcon from "./icons/CopyIcon"; // Import the new icon
+import CopyIcon from "./icons/CopyIcon";
 
 interface AddressAvatarProps {
     accountAddress: string;
@@ -15,10 +15,9 @@ export default function AddressAvatar({ accountAddress }: AddressAvatarProps) {
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(accountAddress).then(() => {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+      setTimeout(() => setCopied(false), 2000);
     }).catch(err => {
       console.error("Failed to copy address: ", err);
-      // Optionally, provide user feedback for error here
     });
   };
 

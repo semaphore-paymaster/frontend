@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ToastContainer, type TypeOptions } from "react-toastify";
+import Image from "next/image";
 import cn from "classnames";
 import AccountManager from "./features/account/AccountManager";
 import CrystalAnimationWrapper from "./components/animations/CrystalAnimationWrapper";
@@ -32,7 +33,7 @@ export default function Home() {
         )}>
           <div className="text-center mb-12">
             <div className="flex items-center justify-center space-x-2 mb-4">
-              <img src="/logo.png" alt="Semaphore Logo" className="h-48 w-auto" />
+              <Image src="/logo.png" alt="Semaphore Logo" width={192} height={192} className="h-48 w-auto" />
             </div>
             <p className={cn(
           "text-slate-400 text-sm leading-relaxed",
