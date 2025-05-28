@@ -6,6 +6,7 @@ import type { KernelAccountClient } from "@zerodev/sdk";
 import type { ENTRYPOINT_ADDRESS_V07 } from "permissionless";
 import AccountStatus from "../../components/status/AccountStatus";
 import VotingComponent from "../voting/VotingComponent";
+import IdentityTest from "../../components/debug/IdentityTest";
 
 interface AccountDashboardProps {
   accountAddress: string;

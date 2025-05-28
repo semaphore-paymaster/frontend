@@ -40,17 +40,28 @@ export default function AccountManager({ onVotingStateChange }: AccountManagerPr
     semaphorePaymasterAddress: process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT as `0x${string}` || "", 
   });
 
+  // Reset membership state when account changes
+  useEffect(() => {
+    console.log("[AccountManager] Account changed to:", accountAddress);
+    // When account changes, we need to re-check membership
+    if (accountAddress) {
+      console.log("[AccountManager] New account detected, will check membership");
+    }
+  }, [accountAddress]);
+
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_PAYMASTER_CONTRACT) {
       console.error("[AccountManager] NEXT_PUBLIC_PAYMASTER_CONTRACT environment variable is not set!");
       return;
     }
     
-    if (isKernelClientReady && accountAddress && isMemberOfGroup === null) {
-      console.log("[AccountManager] Checking group membership, triggered by useEffect.");
+    // Always check membership when kernel client is ready and we have an address
+    // Remove the isMemberOfGroup === null condition to force re-check
+    if (isKernelClientReady && accountAddress) {
+      console.log("[AccountManager] Checking group membership for account:", accountAddress);
       checkGroupMembership();
     }
-  }, [isKernelClientReady, accountAddress, isMemberOfGroup, checkGroupMembership]);
+  }, [isKernelClientReady, accountAddress, checkGroupMembership]);
 
   useEffect(() => {
     const showAnimation = !accountAddress;

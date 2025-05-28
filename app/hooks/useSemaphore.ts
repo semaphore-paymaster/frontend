@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import type { Address } from 'viem';
 import { Identity } from "@semaphore-protocol/identity";
@@ -36,7 +36,10 @@ export const useSemaphore = ({
       return;
     }
 
+    // Always reset state to ensure UI updates
+    setIsMemberOfGroup(null);
     setIsCheckingMembership(true);
+    
     try {
       console.log("[useSemaphore] Starting membership check with params:", {
         accountAddress,
@@ -83,6 +86,47 @@ export const useSemaphore = ({
       } catch (error) {
         console.error("[useSemaphore] Error checking membership:", error);
         throw new Error("Failed to check group membership. Contract call failed.");
+      }
+
+      // Always fetch and log existing members for debugging
+      try {
+        console.log("[useSemaphore] Fetching all group members for debugging...");
+        
+        const memberAddedEvents = await publicClient.getLogs({
+          address: semaphorePaymasterAddress,
+          event: {
+            type: 'event',
+            name: 'MemberAdded',
+            inputs: [
+              { name: 'groupId', type: 'uint256', indexed: true },
+              { name: 'index', type: 'uint256', indexed: false },
+              { name: 'identityCommitment', type: 'uint256', indexed: false },
+              { name: 'merkleTreeRoot', type: 'uint256', indexed: false }
+            ]
+          },
+          args: {
+            groupId: BigInt(groupId)
+          },
+          fromBlock: 'earliest',
+          toBlock: 'latest'
+        });
+        
+        console.log("[useSemaphore] Found", memberAddedEvents.length, "member events");
+        
+        const existingMembers = memberAddedEvents.map(event => ({
+          index: Number(event.args.index),
+          commitment: (event.args.identityCommitment as bigint).toString()
+        }));
+        
+        console.log("[useSemaphore] All group members:");
+        for (const member of existingMembers) {
+          console.log(`  - Index ${member.index}: ${member.commitment}`);
+        }
+        console.log("[useSemaphore] Current user commitment:", identityCommitment.toString());
+        console.log("[useSemaphore] Is user in group?", isMember);
+        
+      } catch (eventError) {
+        console.error("[useSemaphore] Error fetching member events:", eventError);
       }
 
       if (!isMember) {

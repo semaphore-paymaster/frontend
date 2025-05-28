@@ -48,6 +48,19 @@ export default function VotingComponent({
 
   console.log("[VotingComponent] Paymaster contract address:", semaphorePaymasterContractAddress);
 
+  // Debug: Log identity details on component mount
+  useEffect(() => {
+    if (accountAddress) {
+      const identity = new Identity(accountAddress);
+      console.log("[VotingComponent DEBUG] Account details:");
+      console.log("- Address:", accountAddress);
+      console.log("- Identity commitment:", identity.commitment.toString());
+      console.log("- Group ID:", GROUP_ID);
+      console.log("- Is member:", isMemberOfGroup);
+      console.log("- Is checking membership:", isCheckingMembership);
+    }
+  }, [accountAddress, isMemberOfGroup, isCheckingMembership]);
+
   const fetchVoteCounts = useCallback(async () => {
     try {
       const [votesA, votesB] = await Promise.all([
@@ -125,6 +138,11 @@ export default function VotingComponent({
     console.log("[VotingComponent Render] Showing: Access Restricted (isMemberOfGroup is false)");
     const identity = new Identity(accountAddress);
     const commitmentStr = identity.commitment.toString();
+    
+    // Log the commitment for easy copying
+    console.log("[VotingComponent] User identity commitment for manual adding:");
+    console.log("[VotingComponent] Commitment:", commitmentStr);
+    console.log(`[VotingComponent] To add user to group, call: addMember(${GROUP_ID}, ${commitmentStr})`);
     
     return (
       <div className="py-8 px-4 text-center bg-gray-700/20 rounded-lg shadow-md">
@@ -365,7 +383,7 @@ export default function VotingComponent({
         await fetchVoteCounts();
         
         const choiceName = isFirstOptionSelected ? 'A' : 'B';
-        toast.success(`✅ Vote for option ${choiceName} submitted successfully!`);
+        toast.success(`Vote for option ${choiceName} submitted successfully!`);
         
         const explorerUrl = `https://sepolia.basescan.org/tx/${receipt.receipt.transactionHash}`;
         toast.success(`Vote confirmed on blockchain! View at: ${explorerUrl}`);
