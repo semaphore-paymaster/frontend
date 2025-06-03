@@ -1,19 +1,35 @@
 import { sepolia, baseSepolia } from "viem/chains";
 
-// export const BUNDLER_URL =
-//   "https://rpc.zerodev.app/api/v2/bundler/cf030020-fa8b-45a1-a8be-b5442f37e6f3";
-// export const PAYMASTER_URL =
-//   "https://rpc.zerodev.app/api/v2/paymaster/cf030020-fa8b-45a1-a8be-b5442f37e6f3";
-// export const PASSKEY_SERVER_URL =
-//   "https://passkeys.zerodev.app/api/v3/cf030020-fa8b-45a1-a8be-b5442f37e6f3";
+// Ensure environment variables are defined, with fallbacks or errors if not present in a real app
+const projectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID;
+const chainId = process.env.NEXT_PUBLIC_ZERODEV_CHAIN_ID;
 
-// export const CHAIN = sepolia;
+if (!projectId) {
+  console.warn(
+    "NEXT_PUBLIC_ZERODEV_PROJECT_ID is not set. Using default (unsafe) or functionality may be limited."
+  );
+  // Potentially throw an error in production if this is critical
+  // throw new Error("Missing NEXT_PUBLIC_ZERODEV_PROJECT_ID environment variable");
+}
 
-export const CHAIN = baseSepolia;
+if (!chainId) {
+  console.warn(
+    "NEXT_PUBLIC_ZERODEV_CHAIN_ID is not set. Using default (unsafe) or functionality may be limited."
+  );
+  // Potentially throw an error in production if this is critical
+  // throw new Error("Missing NEXT_PUBLIC_ZERODEV_CHAIN_ID environment variable");
+}
 
-export const BUNDLER_URL =
-  "https://rpc.zerodev.app/api/v3/652c9292-be7c-4941-a62d-74716508065a/chain/84532";
-export const PAYMASTER_URL =
-  "https://rpc.zerodev.app/api/v3/652c9292-be7c-4941-a62d-74716508065a/chain/84532";
-export const PASSKEY_SERVER_URL =
-  "https://passkeys.zerodev.app/api/v3/652c9292-be7c-4941-a62d-74716508065a";
+export const CHAIN = baseSepolia; // This might also need to be configured via env var if it changes
+
+export const BUNDLER_URL = projectId && chainId
+  ? `https://rpc.zerodev.app/api/v3/${projectId}/chain/${chainId}`
+  : "https://rpc.zerodev.app/api/v3/DEFAULT_PROJECT_ID_FALLBACK/chain/DEFAULT_CHAIN_ID_FALLBACK"; // Fallback or error
+
+export const PAYMASTER_URL = projectId && chainId
+  ? `https://rpc.zerodev.app/api/v3/${projectId}/chain/${chainId}`
+  : "https://rpc.zerodev.app/api/v3/DEFAULT_PROJECT_ID_FALLBACK/chain/DEFAULT_CHAIN_ID_FALLBACK"; // Fallback or error
+
+export const PASSKEY_SERVER_URL = projectId
+  ? `https://passkeys.zerodev.app/api/v3/${projectId}`
+  : "https://passkeys.zerodev.app/api/v3/DEFAULT_PROJECT_ID_FALLBACK"; // Fallback or error
